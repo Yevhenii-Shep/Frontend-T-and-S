@@ -24,12 +24,15 @@ export const canViewProject = (user: any, project: any) => {
 export const canCreateProject = (user: any) => {
   if (!user) return false
 
+  if (user.role === ROLES.STUDENT) {
+    return user.has_active_team
+  }
+
   return [
     ROLES.ADMIN,
     ROLES.ORGANIZATION_ADMIN,
     ROLES.ORGANIZATION_EMPLOYEE,
     ROLES.NTI_EMPLOYEE,
-    ROLES.STUDENT,
   ].includes(user.role)
 }
 
@@ -38,7 +41,9 @@ export const creatableProgramTypes = (user: any): number[] => {
 
   if (user.role === ROLES.STUDENT) return [1]
 
-  if ([ROLES.NTI_EMPLOYEE, ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(user.role)) {
+  if (
+    [ROLES.NTI_EMPLOYEE, ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(user.role)
+  ) {
     return [2]
   }
 

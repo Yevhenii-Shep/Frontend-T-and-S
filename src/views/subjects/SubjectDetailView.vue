@@ -58,7 +58,7 @@ onMounted(() => {
       <!-- Header -->
       <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h2>{{ subject.name }}</h2>
+          <h2>{{ subject.name }}(ID: {{ subject.id }})</h2>
 
           <p class="text-muted mb-0">
             {{ subject.description || 'No description provided' }}

@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import api from '@/api/axios'
 import { useAuthStore } from '@/stores/auth'
 import { canCreateOrganization } from '@/utils/organizationPermissions'
+import MyOrganizationCardComponent from '@/components/organizations/MyOrganizationCardComponent.vue'
 import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
@@ -37,6 +38,10 @@ onMounted(fetchOrganizations)
       >
         Create Organization
       </button>
+    </div>
+
+    <div v-if="auth.isAuthenticated && auth.user?.organization_id" class="mt-4 mb-2">
+      <MyOrganizationCardComponent />
     </div>
 
     <div v-if="loading" class="text-center py-5">Loading...</div>

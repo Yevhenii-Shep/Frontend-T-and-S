@@ -104,6 +104,7 @@ onMounted(fetchUsers)
           <table class="table table-hover mb-0">
             <thead class="table-dark">
               <tr>
+                <th>ID</th>
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
@@ -114,6 +115,7 @@ onMounted(fetchUsers)
 
             <tbody>
               <tr v-for="user in users" :key="user.id">
+                <td>{{ user.id }}</td>
                 <td>{{ user.name }}</td>
                 <td>{{ user.email }}</td>
                 <td>{{ ROLE_LABELS[user.role] ?? user.role }}</td>

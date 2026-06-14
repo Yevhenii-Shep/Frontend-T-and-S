@@ -12,6 +12,7 @@ import { ROLES } from '@/constants/roles'
 import MyTeamCardComponent from '@/components/teams/MyTeamCardComponent.vue'
 import api from '@/api/axios'
 import { apiData } from '@/utils/apiHelpers'
+import MyOrganizationCardComponent from '@/components/organizations/MyOrganizationCardComponent.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -23,7 +24,7 @@ const error = ref<string | null>(null)
 const isStaff = () =>
   auth.user &&
   [ROLES.ADMIN, ROLES.NTI_EMPLOYEE, ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(
-    auth.user.role
+    auth.user.role,
   )
 
 const joinTeam = async () => {
@@ -60,15 +61,73 @@ const joinTeam = async () => {
 
     <div v-if="!auth.isAuthenticated" class="card mb-4 border-primary">
       <div class="card-body text-center py-5">
-        <h3 class="mb-2">You are not registered yet</h3>
+        <h3 class="mb-2">You are not authenticated yet!</h3>
 
-        <p class="text-muted mb-4">
-          If you are a student, create an account to join or create a team
+        <p class="text-muted mb-2">Do you already have an account? Great, then log in.</p>
+        <button class="btn btn-outline-secondary btn-lg" @click="router.push('/login')">
+          Login in your account
+        </button>
+
+        <p class="text-muted mb-2 mt-4">
+          Are you a student and still haven't registered? Then create an account now.
         </p>
-
         <button class="btn btn-lg btn-success" @click="router.push('/register')">
           Register as Student
         </button>
+      </div>
+    </div>
+
+    <div v-if="auth.isAuthenticated && auth.user?.has_active_team" class="mt-4 mb-2">
+      <MyTeamCardComponent />
+    </div>
+
+    <div v-if="auth.isAuthenticated && auth.user?.organization_id" class="mt-4 mb-2">
+      <MyOrganizationCardComponent />
+    </div>
+
+    <div v-if="canCreateProject(auth.user)" class="col-md-4 col-lg-12 mb-2">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5>New Project</h5>
+          <p class="text-muted">Start a new project</p>
+          <button class="btn btn-primary btn-sm" @click="router.push('/projects/create')">
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="auth.isAuthenticated" class="row g-3">
+      <div v-if="canCreateTeam(auth.user)" class="col-md-6">
+        <div class="card mb-2">
+          <div class="card-body">
+            <h5>Create Team</h5>
+            <p class="text-muted">Start a new team</p>
+
+            <button class="btn btn-primary" @click="router.push('/teams/create')">Create</button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="canJoinTeam(auth.user)" class="col-md-6 mb-2">
+        <div class="card">
+          <div class="card-body">
+            <h5>Join Team</h5>
+            <p class="text-muted">To join the team, you must know the invitation code</p>
+
+            <div class="d-flex gap-2">
+              <input v-model="inviteCode" class="form-control" placeholder="Invite code" />
+
+              <button class="btn btn-success" :disabled="loading" @click="joinTeam">
+                {{ loading ? 'Joining...' : 'Join' }}
+              </button>
+            </div>
+
+            <p v-if="error" class="text-danger mt-2">
+              {{ error }}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -91,21 +150,6 @@ const joinTeam = async () => {
             <h5>Teams</h5>
             <p class="text-muted">View all teams</p>
             <button class="btn btn-outline-primary btn-sm" @click="router.push('/teams')">
-              Open
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>My Profile</h5>
-            <p class="text-muted">Edit your account</p>
-            <button
-              class="btn btn-outline-primary btn-sm"
-              @click="router.push(`/users/${auth.user?.id}`)"
-            >
               Open
             </button>
           </div>
@@ -169,27 +213,12 @@ const joinTeam = async () => {
         </div>
       </div>
 
-      <div v-if="canCreateProject(auth.user)" class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>New Project</h5>
-            <p class="text-muted">Start a new project</p>
-            <button class="btn btn-primary btn-sm" @click="router.push('/projects/create')">
-              Create
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div v-if="canCreateOrganization(auth.user)" class="col-md-4 col-lg-3">
         <div class="card h-100">
           <div class="card-body">
             <h5>New Organization</h5>
             <p class="text-muted">Register organization</p>
-            <button
-              class="btn btn-primary btn-sm"
-              @click="router.push('/organizations/create')"
-            >
+            <button class="btn btn-primary btn-sm" @click="router.push('/organizations/create')">
               Create
             </button>
           </div>
@@ -219,42 +248,6 @@ const joinTeam = async () => {
           </div>
         </div>
       </div>
-    </div>
-
-    <div v-if="auth.isAuthenticated" class="row g-3">
-      <div v-if="canCreateTeam(auth.user)" class="col-md-6">
-        <div class="card">
-          <div class="card-body">
-            <h5>Create Team</h5>
-            <p class="text-muted">Start your own team</p>
-
-            <button class="btn btn-primary" @click="router.push('/teams/create')">Create</button>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="canJoinTeam(auth.user)" class="col-md-6">
-        <div class="card">
-          <div class="card-body">
-            <h5>Join Team</h5>
-            <p class="text-muted">Enter invite code</p>
-
-            <input v-model="inviteCode" class="form-control mb-2" placeholder="Invite code" />
-
-            <button class="btn btn-success" :disabled="loading" @click="joinTeam">
-              {{ loading ? 'Joining...' : 'Join' }}
-            </button>
-
-            <p v-if="error" class="text-danger mt-2">
-              {{ error }}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="auth.isAuthenticated && auth.user?.has_active_team" class="mt-4">
-      <MyTeamCardComponent />
     </div>
   </div>
 </template>

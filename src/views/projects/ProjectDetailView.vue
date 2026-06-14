@@ -151,6 +151,10 @@ const assignTeam = async () => {
   }
 }
 
+const goToTeam = (id: number) => {
+  router.push(`/teams/${id}`)
+}
+
 const assignOrganization = async () => {
   try {
     await api.patch(`/projects/${project.value.id}/assign-organization`, {
@@ -409,7 +413,7 @@ onMounted(fetchProject)
       <!-- header -->
       <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
-          <h2 class="mb-1">{{ project.name }}</h2>
+          <h2 class="mb-1">{{ project.name }}(ID: {{ project.id }})</h2>
           <p class="text-muted mb-0">
             {{ project.description || 'No description' }}
           </p>
@@ -436,10 +440,15 @@ onMounted(fetchProject)
           <p><strong>Category:</strong> {{ project.category_name || '-' }}</p>
           <p><strong>Team:</strong> {{ project.team_name || '-' }}</p>
           <p><strong>Organization:</strong> {{ project.organization_name || '-' }}</p>
-          <p><strong>Program type:</strong> {{ PROGRAM_TYPE_LABELS[project.program_type] ?? project.program_type }}</p>
+          <p>
+            <strong>Program type:</strong>
+            {{ PROGRAM_TYPE_LABELS[project.program_type] ?? project.program_type }}
+          </p>
           <p><strong>Deadline:</strong> {{ project.deadline || '-' }}</p>
           <p><strong>NTI mentor:</strong> {{ project.mentor_from_nti_name || '-' }}</p>
-          <p><strong>Organization mentor:</strong> {{ project.mentor_from_organization_name || '-' }}</p>
+          <p>
+            <strong>Organization mentor:</strong> {{ project.mentor_from_organization_name || '-' }}
+          </p>
         </div>
       </div>
 
@@ -467,7 +476,11 @@ onMounted(fetchProject)
           <div class="d-flex gap-2">
             <input v-model="newDeadline" type="date" class="form-control" />
 
-            <button class="btn btn-primary btn-sm" :disabled="savingDeadline" @click="updateDeadline">
+            <button
+              class="btn btn-primary btn-sm"
+              :disabled="savingDeadline"
+              @click="updateDeadline"
+            >
               Update deadline
             </button>
           </div>
@@ -478,20 +491,41 @@ onMounted(fetchProject)
       <div v-if="canAdminAssignRelations(auth.user)" class="card mb-3">
         <div class="card-body">
           <h5>Assignments (Admin)</h5>
-
+          <p class="text-muted mb-2">Team ID:</p>
           <div class="d-flex gap-2 mb-2">
-            <input v-model.number="assignTeamId" type="number" class="form-control" placeholder="Team ID" />
+            <input
+              v-model.number="assignTeamId"
+              type="number"
+              class="form-control"
+              placeholder="Team ID"
+            />
             <button class="btn btn-outline-primary btn-sm" @click="assignTeam">Assign team</button>
           </div>
 
+          <p class="text-muted mb-2">Organization ID:</p>
           <div class="d-flex gap-2 mb-2">
-            <input v-model.number="assignOrgId" type="number" class="form-control" placeholder="Organization ID" />
-            <button class="btn btn-outline-primary btn-sm" @click="assignOrganization">Assign org</button>
+            <input
+              v-model.number="assignOrgId"
+              type="number"
+              class="form-control"
+              placeholder="Organization ID"
+            />
+            <button class="btn btn-outline-primary btn-sm" @click="assignOrganization">
+              Assign org
+            </button>
           </div>
 
+          <p class="text-muted mb-2">Category ID:</p>
           <div class="d-flex gap-2">
-            <input v-model.number="assignCategoryId" type="number" class="form-control" placeholder="Category ID" />
-            <button class="btn btn-outline-primary btn-sm" @click="assignCategory">Assign category</button>
+            <input
+              v-model.number="assignCategoryId"
+              type="number"
+              class="form-control"
+              placeholder="Category ID"
+            />
+            <button class="btn btn-outline-primary btn-sm" @click="assignCategory">
+              Assign category
+            </button>
           </div>
         </div>
       </div>
@@ -504,11 +538,20 @@ onMounted(fetchProject)
         <div class="card-body">
           <h5>Mentors</h5>
 
+          <p class="text-muted mb-2">Mentor from NTI (User ID):</p>
           <div v-if="canAssignNtiMentor(auth.user)" class="d-flex gap-2 mb-2">
-            <input v-model.number="assignNtiMentorId" type="number" class="form-control" placeholder="NTI mentor user ID" />
-            <button class="btn btn-outline-primary btn-sm" @click="assignNtiMentor">Assign NTI mentor</button>
+            <input
+              v-model.number="assignNtiMentorId"
+              type="number"
+              class="form-control"
+              placeholder="NTI mentor user ID"
+            />
+            <button class="btn btn-outline-primary btn-sm" @click="assignNtiMentor">
+              Assign NTI mentor
+            </button>
           </div>
 
+          <p class="text-muted mb-2">Mentor from Organization (User ID):</p>
           <div v-if="canAssignOrganizationMentor(auth.user, project)" class="d-flex gap-2">
             <input
               v-model.number="assignOrgMentorId"
@@ -516,7 +559,9 @@ onMounted(fetchProject)
               class="form-control"
               placeholder="Organization mentor user ID"
             />
-            <button class="btn btn-outline-primary btn-sm" @click="assignOrgMentor">Assign org mentor</button>
+            <button class="btn btn-outline-primary btn-sm" @click="assignOrgMentor">
+              Assign org mentor
+            </button>
           </div>
         </div>
       </div>
@@ -525,21 +570,11 @@ onMounted(fetchProject)
       <div class="card mb-3">
         <div class="card-body">
           <h5>Team</h5>
-
-          <div v-if="project.team?.users?.length">
-            <ul class="list-group">
-              <li
-                v-for="u in project.team.users"
-                :key="u.id"
-                class="list-group-item d-flex justify-content-between"
-              >
-                <span>{{ u.name }}</span>
-                <span v-if="u.pivot?.is_leader" class="badge bg-primary">Leader</span>
-              </li>
-            </ul>
-          </div>
-
-          <div v-else class="text-muted">No team assigned</div>
+          <td class="text-end">
+            <button class="btn btn-sm btn-primary" @click="goToTeam(project.team?.id)">
+              View team information
+            </button>
+          </td>
         </div>
       </div>
 
@@ -558,7 +593,10 @@ onMounted(fetchProject)
                 <span>{{ doc.name }}</span>
 
                 <div class="d-flex gap-2">
-                  <button class="btn btn-sm btn-outline-primary" @click="downloadDocument(doc.id, doc.name)">
+                  <button
+                    class="btn btn-sm btn-outline-primary"
+                    @click="downloadDocument(doc.id, doc.name)"
+                  >
                     Download
                   </button>
 
@@ -593,11 +631,7 @@ onMounted(fetchProject)
 
           <div v-if="project.milestones?.length">
             <ul class="list-group mb-3">
-              <li
-                v-for="m in project.milestones"
-                :key="m.id"
-                class="list-group-item"
-              >
+              <li v-for="m in project.milestones" :key="m.id" class="list-group-item">
                 <div class="d-flex justify-content-between align-items-start">
                   <div>
                     <div class="fw-bold">{{ m.name }}</div>
@@ -608,14 +642,25 @@ onMounted(fetchProject)
                     <select
                       class="form-select form-select-sm"
                       :value="m.status"
-                      @change="updateMilestoneStatus(m.id, Number(($event.target as HTMLSelectElement).value))"
+                      @change="
+                        updateMilestoneStatus(
+                          m.id,
+                          Number(($event.target as HTMLSelectElement).value),
+                        )
+                      "
                     >
-                      <option v-for="(label, key) in MILESTONE_STATUS_LABELS" :key="key" :value="key">
+                      <option
+                        v-for="(label, key) in MILESTONE_STATUS_LABELS"
+                        :key="key"
+                        :value="key"
+                      >
                         {{ label }}
                       </option>
                     </select>
 
-                    <button class="btn btn-sm btn-danger" @click="deleteMilestone(m.id)">Delete</button>
+                    <button class="btn btn-sm btn-danger" @click="deleteMilestone(m.id)">
+                      Delete
+                    </button>
                   </div>
 
                   <span v-else class="badge bg-secondary">
@@ -637,16 +682,29 @@ onMounted(fetchProject)
             </div>
             <div class="col-md-4">
               <select v-model.number="milestoneForm.status" class="form-select">
-                <option v-for="(label, key) in MILESTONE_STATUS_LABELS" :key="key" :value="Number(key)">
+                <option
+                  v-for="(label, key) in MILESTONE_STATUS_LABELS"
+                  :key="key"
+                  :value="Number(key)"
+                >
                   {{ label }}
                 </option>
               </select>
             </div>
             <div class="col-12">
-              <textarea v-model="milestoneForm.description" class="form-control" placeholder="Description" rows="2" />
+              <textarea
+                v-model="milestoneForm.description"
+                class="form-control"
+                placeholder="Description"
+                rows="2"
+              />
             </div>
             <div class="col-auto">
-              <button class="btn btn-primary btn-sm" :disabled="savingMilestone" @click="createMilestone">
+              <button
+                class="btn btn-primary btn-sm"
+                :disabled="savingMilestone"
+                @click="createMilestone"
+              >
                 Add milestone
               </button>
             </div>
@@ -695,7 +753,11 @@ onMounted(fetchProject)
               placeholder="Score"
             />
             <input v-model="evaluationForm.comment" class="form-control" placeholder="Comment" />
-            <button class="btn btn-primary btn-sm" :disabled="savingEvaluation" @click="createEvaluation">
+            <button
+              class="btn btn-primary btn-sm"
+              :disabled="savingEvaluation"
+              @click="createEvaluation"
+            >
               Add
             </button>
           </div>

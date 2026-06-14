@@ -55,7 +55,7 @@ onMounted(() => {
       <!-- Header -->
       <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h2>{{ category.name }}</h2>
+          <h2>{{ category.name }}(ID: {{ category.id }})</h2>
 
           <p class="text-muted mb-0">
             {{ category.slug }}

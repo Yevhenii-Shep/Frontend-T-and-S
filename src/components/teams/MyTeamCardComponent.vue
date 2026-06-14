@@ -18,7 +18,7 @@ const goToTeam = () => {
 <template>
   <div v-if="hasTeam" class="card mt-3">
     <div class="card-body">
-      <h5>You are currently in an active team</h5>
+      <h5>You are a member of an active team</h5>
 
       <div class="d-flex align-items-center justify-content-center">
         <button class="btn btn-outline-primary btn-sm" @click="goToTeam">Open Your Team</button>

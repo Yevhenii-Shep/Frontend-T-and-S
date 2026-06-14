@@ -62,6 +62,14 @@ const logout = async () => {
             </li>
 
             <li class="nav-item">
+              <button
+                class="btn btn-outline-light btn-sm me-1"
+                @click="router.push(`/users/${auth.user?.id}`)"
+              >
+                Your Profile
+              </button>
+            </li>
+            <li class="nav-item">
               <button class="btn btn-outline-light btn-sm" @click="logout">Logout</button>
             </li>
           </template>

@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/api/axios'
 import { canCreateTeam, canJoinTeam } from '@/utils/teamPermissions'
+import MyTeamCardComponent from '@/components/teams/MyTeamCardComponent.vue'
 import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
@@ -42,7 +43,6 @@ onMounted(() => {
   <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h2 class="mb-0">Teams</h2>
-
       <div class="d-flex gap-2">
         <select v-model="status" class="form-select" @change="fetchTeams">
           <option value="">All</option>
@@ -50,6 +50,9 @@ onMounted(() => {
           <option value="inactive">Inactive</option>
         </select>
       </div>
+    </div>
+    <div v-if="auth.isAuthenticated && auth.user?.has_active_team" class="mt-4 mb-2">
+      <MyTeamCardComponent />
     </div>
 
     <div v-if="loading" class="text-center py-5">Loading...</div>

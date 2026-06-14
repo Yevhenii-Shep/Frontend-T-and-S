@@ -176,6 +176,7 @@ onMounted(async () => {
       <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
           <h2 class="mb-1">{{ user.name }}</h2>
+          <h3 class="mb-1">User ID: {{ user.id }}</h3>
           <p class="text-muted mb-0">{{ user.email }}</p>
         </div>
 
@@ -212,7 +213,11 @@ onMounted(async () => {
 
           <div class="d-flex gap-2">
             <input type="file" class="form-control" accept="image/*" @change="onAvatarChange" />
-            <button class="btn btn-primary btn-sm" :disabled="uploadingAvatar" @click="uploadAvatar">
+            <button
+              class="btn btn-primary btn-sm"
+              :disabled="uploadingAvatar"
+              @click="uploadAvatar"
+            >
               Upload
             </button>
           </div>
@@ -246,7 +251,9 @@ onMounted(async () => {
                       class="form-control form-control-sm"
                       style="width: 80px"
                       :value="subject.grade ?? subject.pivot?.grade"
-                      @change="updateGrade(subject.id, Number(($event.target as HTMLInputElement).value))"
+                      @change="
+                        updateGrade(subject.id, Number(($event.target as HTMLInputElement).value))
+                      "
                     />
 
                     <button class="btn btn-sm btn-danger" @click="removeSubject(subject.id)">

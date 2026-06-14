@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/api/axios'
+import { apiData } from '@/utils/apiHelpers'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -26,7 +27,6 @@ export const useAuthStore = defineStore('auth', {
       this.token = response.data.token
       localStorage.setItem('token', response.data.token)
 
-      // сразу загружаем пользователя
       await this.fetchUser()
     },
 
@@ -39,16 +39,14 @@ export const useAuthStore = defineStore('auth', {
       this.token = response.data.token
       localStorage.setItem('token', response.data.token)
 
-      // ❗ ВСЕГДА берем актуального user с /me
       await this.fetchUser()
     },
 
     async fetchUser() {
       try {
         const response = await api.get('/me')
-        this.user = response.data
-      } catch (error) {
-        // если токен невалидный — чистим всё
+        this.user = apiData(response)
+      } catch {
         this.token = null
         this.user = null
         localStorage.removeItem('token')
@@ -71,7 +69,6 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('token')
     },
 
-    // полезно при перезагрузке приложения
     async initAuth() {
       if (!this.token) {
         this.isReady = true

@@ -4,6 +4,8 @@ import api from '@/api/axios'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { canCreateProject } from '@/utils/projectPermissions'
+import { PROJECT_STATUS_LABELS } from '@/constants/project'
+import { apiList } from '@/utils/apiHelpers'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -23,13 +25,22 @@ const fetchProjects = async () => {
 
   try {
     const res = await api.get('/projects', {
-      params: filters.value,
+      params: {
+        status: filters.value.status || undefined,
+        organization_id: filters.value.organization_id || undefined,
+        team_id: filters.value.team_id || undefined,
+        category_id: filters.value.category_id || undefined,
+      },
     })
 
-    projects.value = res.data.data
+    projects.value = apiList(res)
   } finally {
     loading.value = false
   }
+}
+
+const goToProject = (id: number) => {
+  router.push(`/projects/${id}`)
 }
 
 onMounted(fetchProjects)
@@ -38,7 +49,7 @@ onMounted(fetchProjects)
 <template>
   <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h2>Projects</h2>
+      <h2 class="mb-0">Projects</h2>
 
       <button
         v-if="canCreateProject(auth.user)"
@@ -51,16 +62,29 @@ onMounted(fetchProjects)
 
     <!-- filters -->
     <div class="row g-2 mb-3">
-      <div class="col">
-        <input v-model="filters.status" class="form-control" placeholder="Status" />
+      <div class="col-md-3">
+        <select v-model="filters.status" class="form-select">
+          <option value="">All statuses</option>
+          <option value="0">Pending</option>
+          <option value="1">Active</option>
+          <option value="2">Done</option>
+        </select>
       </div>
 
-      <div class="col">
+      <div class="col-md-3">
         <input v-model="filters.team_id" class="form-control" placeholder="Team ID" />
       </div>
 
-      <div class="col">
+      <div class="col-md-3">
         <input v-model="filters.category_id" class="form-control" placeholder="Category ID" />
+      </div>
+
+      <div class="col-md-3">
+        <input
+          v-model="filters.organization_id"
+          class="form-control"
+          placeholder="Organization ID"
+        />
       </div>
 
       <div class="col-auto">
@@ -68,25 +92,41 @@ onMounted(fetchProjects)
       </div>
     </div>
 
-    <!-- list -->
-    <div v-if="loading">Loading...</div>
+    <div v-if="loading" class="text-center py-5">Loading...</div>
 
-    <div v-else class="list-group">
-      <div
-        v-for="p in projects"
-        :key="p.id"
-        class="list-group-item d-flex justify-content-between align-items-center"
-      >
-        <div>
-          <div class="fw-bold">{{ p.name }}</div>
-          <div class="text-muted">
-            {{ p.category_name }} • {{ p.team_name }} • {{ p.organization_name }}
-          </div>
-        </div>
+    <div v-else class="card">
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Team</th>
+              <th>Status</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
 
-        <button class="btn btn-sm btn-outline-primary" @click="router.push(`/projects/${p.id}`)">
-          Open
-        </button>
+          <tbody>
+            <tr v-for="p in projects" :key="p.id">
+              <td>{{ p.name }}</td>
+              <td>{{ p.category_name || '-' }}</td>
+              <td>{{ p.team_name || '-' }}</td>
+              <td>
+                <span class="badge bg-secondary">
+                  {{ PROJECT_STATUS_LABELS[p.status] ?? p.status }}
+                </span>
+              </td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-primary" @click="goToProject(p.id)">View</button>
+              </td>
+            </tr>
+
+            <tr v-if="projects.length === 0">
+              <td colspan="5" class="text-center py-4">No projects found</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

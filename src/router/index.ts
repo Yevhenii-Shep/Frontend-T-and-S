@@ -7,6 +7,7 @@ import SubjectListView from '@/views/subjects/SubjectListView.vue'
 import OrganizationListView from '@/views/organizations/OrganizationListView.vue'
 import ProjectListView from '@/views/projects/ProjectListView.vue'
 import RegisterView from '@/views/auth/RegisterView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -34,10 +35,9 @@ const router = createRouter({
       component: TeamListView,
     },
     {
-      path: '/teams/:id',
-      name: 'team-detail',
-      component: () => import('@/views/teams/TeamDetailView.vue'),
-      props: true,
+      path: '/teams/create',
+      name: 'team-create',
+      component: () => import('@/views/teams/TeamCreateView.vue'),
     },
     {
       path: '/teams/:id/edit',
@@ -46,9 +46,10 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/teams/create',
-      name: 'team-create',
-      component: () => import('@/views/teams/TeamCreateView.vue'),
+      path: '/teams/:id',
+      name: 'team-detail',
+      component: () => import('@/views/teams/TeamDetailView.vue'),
+      props: true,
     },
 
     // Categories
@@ -58,10 +59,9 @@ const router = createRouter({
       component: CategoryListView,
     },
     {
-      path: '/categories/:id',
-      name: 'category-detail',
-      component: () => import('@/views/categories/CategoryDetailView.vue'),
-      props: true,
+      path: '/categories/create',
+      name: 'category-create',
+      component: () => import('@/views/categories/CategoryCreateView.vue'),
     },
     {
       path: '/categories/:id/edit',
@@ -70,9 +70,10 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/categories/create',
-      name: 'category-create',
-      component: () => import('@/views/categories/CategoryCreateView.vue'),
+      path: '/categories/:id',
+      name: 'category-detail',
+      component: () => import('@/views/categories/CategoryDetailView.vue'),
+      props: true,
     },
 
     // Subjects
@@ -82,10 +83,9 @@ const router = createRouter({
       component: SubjectListView,
     },
     {
-      path: '/subjects/:id',
-      name: 'subjects-detail',
-      component: () => import('@/views/subjects/SubjectDetailView.vue'),
-      props: true,
+      path: '/subjects/create',
+      name: 'subjects-create',
+      component: () => import('@/views/subjects/SubjectCreateView.vue'),
     },
     {
       path: '/subjects/:id/edit',
@@ -94,9 +94,10 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/subjects/create',
-      name: 'subjects-create',
-      component: () => import('@/views/subjects/SubjectCreateView.vue'),
+      path: '/subjects/:id',
+      name: 'subjects-detail',
+      component: () => import('@/views/subjects/SubjectDetailView.vue'),
+      props: true,
     },
 
     // Organizations
@@ -106,10 +107,9 @@ const router = createRouter({
       component: OrganizationListView,
     },
     {
-      path: '/organizations/:id',
-      name: 'organizations-detail',
-      component: () => import('@/views/organizations/OrganizationDetailView.vue'),
-      props: true,
+      path: '/organizations/create',
+      name: 'organizations-create',
+      component: () => import('@/views/organizations/OrganizationCreateView.vue'),
     },
     {
       path: '/organizations/:id/edit',
@@ -118,9 +118,10 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/organizations/create',
-      name: 'organizations-create',
-      component: () => import('@/views/organizations/OrganizationCreateView.vue'),
+      path: '/organizations/:id',
+      name: 'organizations-detail',
+      component: () => import('@/views/organizations/OrganizationDetailView.vue'),
+      props: true,
     },
 
     // Projects
@@ -130,12 +131,61 @@ const router = createRouter({
       component: ProjectListView,
     },
     {
+      path: '/projects/create',
+      name: 'project-create',
+      component: () => import('@/views/projects/ProjectCreateView.vue'),
+    },
+    {
+      path: '/projects/:id/edit',
+      name: 'project-edit',
+      component: () => import('@/views/projects/ProjectEditView.vue'),
+      props: true,
+    },
+    {
       path: '/projects/:id',
       name: 'projects-detail',
       component: () => import('@/views/projects/ProjectDetailView.vue'),
       props: true,
     },
+
+    // Users
+    {
+      path: '/users',
+      name: 'users',
+      component: () => import('@/views/users/UserListView.vue'),
+    },
+    {
+      path: '/users/create',
+      name: 'user-create',
+      component: () => import('@/views/users/UserCreateView.vue'),
+    },
+    {
+      path: '/users/:id/edit',
+      name: 'user-edit',
+      component: () => import('@/views/users/UserEditView.vue'),
+      props: true,
+    },
+    {
+      path: '/users/:id',
+      name: 'user-detail',
+      component: () => import('@/views/users/UserDetailView.vue'),
+      props: true,
+    },
   ],
+})
+
+const publicRoutes = ['home', 'login', 'register']
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+
+  if (!auth.isReady) {
+    await auth.initAuth()
+  }
+
+  if (!auth.isAuthenticated && !publicRoutes.includes(to.name as string)) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
 })
 
 export default router

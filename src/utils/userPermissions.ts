@@ -6,43 +6,25 @@ export const canViewUsers = (user: any) => {
   return [ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(user.role)
 }
 
-export const canCreateUser = (user: any) => {
-  if (!user) return false
+export const canCreateUser = (user: any) => canViewUsers(user)
 
-  if (user.role === ROLES.ADMIN) return true
+export const canDeleteUser = (user: any, target: any) => {
+  if (!user || !target) return false
 
-  if (user.role === ROLES.NTI_EMPLOYEE) return true
+  if (!canCreateUser(user)) return false
 
-  if (user.role === ROLES.ORGANIZATION_ADMIN) return true
-
-  return false
+  return user.id !== target.id
 }
 
 export const canEditUser = (actor: any, target: any) => {
   if (!actor || !target) return false
 
-  if (actor.role === ROLES.ADMIN) return true
-
-  if (actor.role === ROLES.NTI_EMPLOYEE) return true
-
-  // org admin может редактировать только свою организацию
-  if (actor.role === ROLES.ORGANIZATION_ADMIN) {
-    return actor.organization_id === target.organization_id
-  }
-
-  // пользователь может редактировать себя
-  return actor.id === target.id
-}
-
-export const canDeleteUser = (actor: any, target: any) => {
-  if (!actor || !target) return false
+  if (actor.id === target.id) return true
 
   if (actor.role === ROLES.ADMIN) return true
 
-  if (actor.role === ROLES.NTI_EMPLOYEE) return true
-
-  if (actor.role === ROLES.ORGANIZATION_ADMIN) {
-    return actor.organization_id === target.organization_id
+  if (actor.role === ROLES.NTI_EMPLOYEE) {
+    return ![ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(target.role)
   }
 
   return false
@@ -53,9 +35,7 @@ export const canViewUser = (actor: any, target: any) => {
 
   if (actor.role === ROLES.ADMIN || actor.role === ROLES.NTI_EMPLOYEE) return true
 
-  if (actor.role === ROLES.ORGANIZATION_ADMIN) {
-    return actor.organization_id === target.organization_id
-  }
-
   return actor.id === target.id
 }
+
+export const canManageSubjectGrades = (user: any) => canViewUsers(user)

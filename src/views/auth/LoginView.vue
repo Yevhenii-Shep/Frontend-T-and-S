@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const email = ref('')
 const password = ref('')
@@ -16,7 +17,8 @@ const handleLogin = async () => {
 
     await authStore.login(email.value, password.value)
 
-    router.push('/')
+    const redirect = route.query.redirect as string
+    router.push(redirect || '/')
   } catch {
     error.value = 'Invalid credentials'
   }

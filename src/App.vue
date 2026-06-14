@@ -6,12 +6,8 @@ import NavBarComponent from '@/components/NavBarComponent.vue'
 const authStore = useAuthStore()
 
 onMounted(async () => {
-  if (authStore.token) {
-    try {
-      await authStore.fetchUser()
-    } catch {
-      await authStore.logout()
-    }
+  if (!authStore.isReady) {
+    await authStore.initAuth()
   }
 })
 </script>

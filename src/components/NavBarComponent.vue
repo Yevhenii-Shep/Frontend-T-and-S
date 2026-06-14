@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { canViewUsers } from '@/utils/userPermissions'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -26,7 +27,7 @@ const logout = async () => {
       </button>
 
       <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav me-auto">
+        <ul v-if="auth.isAuthenticated" class="navbar-nav me-auto">
           <li class="nav-item">
             <RouterLink class="nav-link" to="/teams"> Teams </RouterLink>
           </li>
@@ -47,15 +48,17 @@ const logout = async () => {
             <RouterLink class="nav-link" to="/organizations"> Organizations </RouterLink>
           </li>
 
-          <li class="nav-item">
+          <li v-if="canViewUsers(auth.user)" class="nav-item">
             <RouterLink class="nav-link" to="/users"> Users </RouterLink>
           </li>
         </ul>
 
         <ul class="navbar-nav ms-auto">
           <template v-if="auth.isAuthenticated">
-            <li class="nav-item d-flex align-items-center me-3 text-light">
-              {{ auth.user?.name }}
+            <li class="nav-item d-flex align-items-center me-3">
+              <RouterLink class="nav-link text-light py-0" :to="`/users/${auth.user?.id}`">
+                {{ auth.user?.name }}
+              </RouterLink>
             </li>
 
             <li class="nav-item">

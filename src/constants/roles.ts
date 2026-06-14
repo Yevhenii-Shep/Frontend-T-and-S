@@ -1,0 +1,7 @@
+export const ROLES = {
+  ADMIN: 1,
+  STUDENT: 2,
+  ORGANIZATION_EMPLOYEE: 3,
+  ORGANIZATION_ADMIN: 4,
+  NTI_EMPLOYEE: 5,
+} as const

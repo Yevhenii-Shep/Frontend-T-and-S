@@ -163,7 +163,7 @@ onMounted(fetchOrganization)
               v-model.number="newAdminId"
               type="number"
               class="form-control"
-              placeholder="New admin user IDss"
+              placeholder="New admin user ID"
             />
 
             <button class="btn btn-warning" :disabled="changingAdmin" @click="changeAdmin">

@@ -40,8 +40,8 @@ const fetchProjects = async () => {
   }
 }
 
-const goToProject = (id: number) => {
-  router.push(`/projects/${id}`)
+const goToProject = (slug: String) => {
+  router.push(`/projects/${slug}`)
 }
 
 const filterMyTeam = () => {
@@ -68,8 +68,7 @@ const clearFilters = () => {
   fetchProjects()
 }
 
-const showMyTeamFilter = () =>
-  auth.user?.role === ROLES.STUDENT && !!auth.user.active_team_id
+const showMyTeamFilter = () => auth.user?.role === ROLES.STUDENT && !!auth.user.active_team_id
 
 const showMyOrgFilter = () =>
   [ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(auth.user?.role) &&
@@ -121,11 +120,7 @@ onMounted(fetchProjects)
 
       <div class="col-auto d-flex gap-2 flex-wrap">
         <button class="btn btn-outline-primary" @click="fetchProjects">Filter</button>
-        <button
-          v-if="showMyTeamFilter()"
-          class="btn btn-outline-secondary"
-          @click="filterMyTeam"
-        >
+        <button v-if="showMyTeamFilter()" class="btn btn-outline-secondary" @click="filterMyTeam">
           My team projects
         </button>
         <button
@@ -165,7 +160,7 @@ onMounted(fetchProjects)
                 </span>
               </td>
               <td class="text-end">
-                <button class="btn btn-sm btn-primary" @click="goToProject(p.id)">View</button>
+                <button class="btn btn-sm btn-primary" @click="goToProject(p.slug)">View</button>
               </td>
             </tr>
 

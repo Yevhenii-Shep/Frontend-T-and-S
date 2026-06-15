@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api/axios'
 import { useAuthStore } from '@/stores/auth'
-import { canEditProject } from '@/utils/projectPermissions'
+import { canEditProject, canEditProjectBaseInfo } from '@/utils/projectPermissions'
 import { apiData } from '@/utils/apiHelpers'
 
 const route = useRoute()
@@ -65,7 +65,7 @@ onMounted(fetchProject)
     <div v-if="loading" class="text-center py-5">Loading...</div>
 
     <div v-else-if="project">
-      <div v-if="canEditProject(auth.user, project)">
+      <div v-if="canEditProjectBaseInfo(auth.user, project)">
         <h2 class="mb-4">Edit Project</h2>
 
         <div class="card">

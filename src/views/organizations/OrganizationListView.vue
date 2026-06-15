@@ -56,7 +56,7 @@ onMounted(fetchOrganizations)
               {{ org.sector || 'No sector' }}
             </p>
 
-            <RouterLink class="btn btn-outline-primary btn-sm" :to="`/organizations/${org.id}`">
+            <RouterLink class="btn btn-outline-primary btn-sm" :to="`/organizations/${org.slug}`">
               Open
             </RouterLink>
           </div>

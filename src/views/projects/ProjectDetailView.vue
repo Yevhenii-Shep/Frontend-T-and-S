@@ -19,6 +19,7 @@ import {
   canAssignTeamToProject,
   canDeleteProject,
   canEditProject,
+  canEditProjectBaseInfo,
   canModifyProjectChildren,
   canUpdateStatusOrDeadline,
   canUploadProjectDocuments,
@@ -433,15 +434,15 @@ onMounted(fetchProject)
         <div>
           <h2 class="mb-1">{{ project.name }}(ID: {{ project.id }})</h2>
           <p class="text-muted mb-0">
-            {{ project.description || 'No description' }}
+            {{ project.slug || 'No description' }}
           </p>
         </div>
 
         <div class="d-flex gap-2">
           <button
-            v-if="canEditProject(auth.user, project)"
+            v-if="canEditProjectBaseInfo(auth.user, project)"
             class="btn btn-outline-primary btn-sm"
-            @click="router.push(`/projects/${project.id}/edit`)"
+            @click="router.push(`/projects/${project.slug}/edit`)"
           >
             Edit
           </button>
@@ -466,6 +467,17 @@ onMounted(fetchProject)
           <p><strong>NTI mentor:</strong> {{ project.mentor_from_nti_name || '-' }}</p>
           <p>
             <strong>Organization mentor:</strong> {{ project.mentor_from_organization_name || '-' }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5>Description</h5>
+
+          <p class="mb-0">
+            {{ project.description || 'No description provided' }}
           </p>
         </div>
       </div>
@@ -505,6 +517,35 @@ onMounted(fetchProject)
         </div>
       </div>
 
+      <!-- team -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5>Team</h5>
+          <p v-if="project.team_name" class="mb-2">
+            {{ project.team_name }}
+          </p>
+
+          <div v-if="project.team?.users?.length" class="mb-3">
+            <ul class="list-group">
+              <li v-for="member in project.team.users" :key="member.id" class="list-group-item">
+                <RouterLink v-if="canViewUser(auth.user, member)" :to="`/users/${member.id}`">
+                  {{ member.name }}
+                </RouterLink>
+                <span v-else>{{ member.name }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <button
+            v-if="project.team?.id"
+            class="btn btn-sm btn-primary"
+            @click="goToTeam(project.team.id)"
+          >
+            Open team page
+          </button>
+        </div>
+      </div>
+
       <!-- team assignment -->
       <div v-if="canAssignTeamToProject(auth.user, project)" class="card mb-3">
         <div class="card-body">
@@ -541,9 +582,7 @@ onMounted(fetchProject)
           </template>
 
           <template v-else>
-            <p class="text-muted mb-2">
-              Claim this project for your organization to manage it.
-            </p>
+            <p class="text-muted mb-2">Claim this project for your organization to manage it.</p>
             <button class="btn btn-outline-primary btn-sm" @click="claimForMyOrganization">
               Claim for my organization
             </button>
@@ -602,43 +641,6 @@ onMounted(fetchProject)
               Assign org mentor
             </button>
           </div>
-        </div>
-      </div>
-
-      <!-- team -->
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5>Team</h5>
-          <p v-if="project.team_name" class="mb-2">
-            <strong>{{ project.team_name }}</strong>
-          </p>
-
-          <div v-if="project.team?.users?.length" class="mb-3">
-            <h6 class="mb-2">Members</h6>
-            <ul class="list-group">
-              <li
-                v-for="member in project.team.users"
-                :key="member.id"
-                class="list-group-item"
-              >
-                <RouterLink
-                  v-if="canViewUser(auth.user, member)"
-                  :to="`/users/${member.id}`"
-                >
-                  {{ member.name }}
-                </RouterLink>
-                <span v-else>{{ member.name }}</span>
-              </li>
-            </ul>
-          </div>
-
-          <button
-            v-if="project.team?.id"
-            class="btn btn-sm btn-primary"
-            @click="goToTeam(project.team.id)"
-          >
-            View team information
-          </button>
         </div>
       </div>
 

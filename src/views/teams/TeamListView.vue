@@ -30,8 +30,8 @@ const fetchTeams = async () => {
   }
 }
 
-const goToTeam = (id: number) => {
-  router.push(`/teams/${id}`)
+const goToTeam = (slug: String) => {
+  router.push(`/teams/${slug}`)
 }
 
 onMounted(() => {
@@ -84,7 +84,7 @@ onMounted(() => {
               </td>
 
               <td class="text-end">
-                <button class="btn btn-sm btn-primary" @click="goToTeam(team.id)">View</button>
+                <button class="btn btn-sm btn-primary" @click="goToTeam(team.slug)">View</button>
               </td>
             </tr>
 

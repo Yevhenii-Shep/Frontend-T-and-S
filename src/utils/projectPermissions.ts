@@ -69,6 +69,23 @@ export const canWriteProject = (user: any, project: any) => {
 
 export const canEditProject = (user: any, project: any) => canWriteProject(user, project)
 
+export const canEditProjectBaseInfo = (user: any, project: any) => {
+  if (!user || !project) return false
+
+  if (user.role === ROLES.ADMIN) return true
+  if (user.role === ROLES.NTI_EMPLOYEE) return true
+
+  if (user.role === ROLES.ORGANIZATION_ADMIN || user.role === ROLES.ORGANIZATION_EMPLOYEE) {
+    return user.organization_id && project.organization_id === user.organization_id
+  }
+
+  if (user.role === ROLES.STUDENT) {
+    return user.active_team_id === project.team_id
+  }
+
+  return false
+}
+
 export const canDeleteProject = (user: any, project: any) => {
   if (!user || !project) return false
 

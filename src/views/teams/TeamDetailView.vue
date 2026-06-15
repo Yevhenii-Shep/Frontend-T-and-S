@@ -93,7 +93,7 @@ onMounted(() => {
           <button
             v-if="canManage()"
             class="btn btn-outline-primary btn-sm"
-            @click="router.push(`/teams/${team.id}/edit`)"
+            @click="router.push(`/teams/${team.slug}/edit`)"
           >
             Edit
           </button>

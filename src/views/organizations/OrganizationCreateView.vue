@@ -54,7 +54,11 @@ const submit = async () => {
       </div>
 
       <div class="mb-2">
-        <input v-model="form.slug" class="form-control" placeholder="Slug" />
+        <input
+          v-model="form.slug"
+          class="form-control"
+          placeholder="Slug (leave blank for auto-generated)"
+        />
       </div>
 
       <div class="mb-2">

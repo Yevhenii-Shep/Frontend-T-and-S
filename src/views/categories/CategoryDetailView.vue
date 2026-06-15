@@ -65,7 +65,7 @@ onMounted(() => {
         <div v-if="canManageCategories(auth.user)" class="d-flex gap-2">
           <button
             class="btn btn-outline-primary"
-            @click="router.push(`/categories/${category.id}/edit`)"
+            @click="router.push(`/categories/${category.slug}/edit`)"
           >
             Edit
           </button>

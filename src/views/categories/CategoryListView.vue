@@ -54,7 +54,7 @@ onMounted(() => {
               {{ category.name }}
             </h5>
 
-            <RouterLink :to="`/categories/${category.id}`" class="btn btn-outline-primary btn-sm">
+            <RouterLink :to="`/categories/${category.slug}`" class="btn btn-outline-primary btn-sm">
               Open
             </RouterLink>
           </div>

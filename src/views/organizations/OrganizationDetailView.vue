@@ -55,7 +55,7 @@ onMounted(() => {
         <div>
           <h2>{{ organization.name }}(ID: {{ organization.id }})</h2>
           <p class="text-muted mb-0">
-            {{ organization.description || 'No description' }}
+            {{ organization.slug }}
           </p>
         </div>
 
@@ -63,7 +63,7 @@ onMounted(() => {
           <button
             v-if="canEditOrganization(auth.user, organization)"
             class="btn btn-outline-primary"
-            @click="router.push(`/organizations/${organization.id}/edit`)"
+            @click="router.push(`/organizations/${organization.slug}/edit`)"
           >
             Edit
           </button>
@@ -75,6 +75,17 @@ onMounted(() => {
           >
             Delete
           </button>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5>Description</h5>
+
+          <p class="mb-0">
+            {{ organization.description || 'No description provided' }}
+          </p>
         </div>
       </div>
 

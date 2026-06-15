@@ -72,7 +72,11 @@ onMounted(async () => {
         <div class="mb-3">
           <label class="form-label"> Slug </label>
 
-          <input v-model="form.slug" class="form-control" required />
+          <input
+            v-model="form.slug"
+            class="form-control"
+            placeholder="Slug (leave blank for auto-generated)"
+          />
         </div>
 
         <!-- Description -->

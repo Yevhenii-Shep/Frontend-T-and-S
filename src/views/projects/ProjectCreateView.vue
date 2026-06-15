@@ -52,7 +52,7 @@ watch(
     if (!form.value.slug) {
       form.value.slug = slugify(name)
     }
-  }
+  },
 )
 
 const createProject = async () => {
@@ -98,7 +98,6 @@ onMounted(async () => {
     if (types.length === 1 && types[0] !== undefined) {
       form.value.program_type = types[0]
     }
-
   } finally {
     loading.value = false
   }
@@ -107,9 +106,7 @@ onMounted(async () => {
 
 <template>
   <div class="container py-4">
-    <button class="btn btn-outline-secondary mb-3" @click="router.push('/projects')">
-      ← Back
-    </button>
+    <button class="btn btn-outline-secondary mb-3" @click="router.push('/projects')">← Back</button>
 
     <div v-if="loading" class="text-center py-5">Loading...</div>
 
@@ -129,7 +126,11 @@ onMounted(async () => {
 
           <div class="mb-3">
             <label class="form-label">Slug</label>
-            <input v-model="form.slug" class="form-control" required />
+            <input
+              v-model="form.slug"
+              class="form-control"
+              placeholder="Slug (leave blank for auto-generated)"
+            />
           </div>
 
           <div class="mb-3">

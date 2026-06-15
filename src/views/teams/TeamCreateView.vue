@@ -64,13 +64,17 @@ const createTeam = async () => {
         <!-- name -->
         <div class="mb-3">
           <label class="form-label">Name</label>
-          <input v-model="form.name" class="form-control" />
+          <input v-model="form.name" class="form-control" required />
         </div>
 
         <!-- slug -->
         <div class="mb-3">
           <label class="form-label">Slug</label>
-          <input v-model="form.slug" class="form-control" />
+          <input
+            v-model="form.slug"
+            class="form-control"
+            placeholder="Slug (leave blank for auto-generated)"
+          />
         </div>
 
         <!-- description -->

@@ -11,9 +11,9 @@ const organization = computed(() => auth.user?.organization)
 const organizationName = computed(() => auth.user?.organization?.name)
 
 const goToOrg = () => {
-  const id = organization.value?.id
-  if (!id) return
-  router.push(`/organizations/${id}`)
+  const slug = organization.value?.slug
+  if (!slug) return
+  router.push(`/organizations/${slug}`)
 }
 </script>
 

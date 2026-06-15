@@ -16,6 +16,8 @@ export const canDeleteUser = (user: any, target: any) => {
   return user.id !== target.id
 }
 
+export const canDeleteOwnAccount = (user: any) => !!user
+
 export const canEditUser = (actor: any, target: any) => {
   if (!actor || !target) return false
 
@@ -35,7 +37,35 @@ export const canViewUser = (actor: any, target: any) => {
 
   if (actor.role === ROLES.ADMIN || actor.role === ROLES.NTI_EMPLOYEE) return true
 
-  return actor.id === target.id
+  if (actor.id === target.id) return true
+
+  if (actor.role === ROLES.ORGANIZATION_ADMIN || actor.role === ROLES.ORGANIZATION_EMPLOYEE) {
+    if ([ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(target.role)) {
+      return false
+    }
+
+    if (target.organization_id && actor.organization_id === target.organization_id) {
+      return true
+    }
+
+    return target.role === ROLES.STUDENT
+  }
+
+  return false
 }
 
 export const canManageSubjectGrades = (user: any) => canViewUsers(user)
+
+export const canViewStudentSubjects = (actor: any, target: any) => {
+  if (!actor || !target || target.role !== ROLES.STUDENT) return false
+
+  if (canManageSubjectGrades(actor)) return true
+
+  if (actor.id === target.id) return true
+
+  if (actor.role === ROLES.ORGANIZATION_ADMIN || actor.role === ROLES.ORGANIZATION_EMPLOYEE) {
+    return canViewUser(actor, target)
+  }
+
+  return false
+}

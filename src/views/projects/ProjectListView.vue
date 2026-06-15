@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import api from '@/api/axios'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { ROLES } from '@/constants/roles'
 import { canCreateProject } from '@/utils/projectPermissions'
 import { PROJECT_STATUS_LABELS } from '@/constants/project'
 import { apiList } from '@/utils/apiHelpers'
@@ -42,6 +43,37 @@ const fetchProjects = async () => {
 const goToProject = (id: number) => {
   router.push(`/projects/${id}`)
 }
+
+const filterMyTeam = () => {
+  if (!auth.user?.active_team_id) return
+
+  filters.value.team_id = String(auth.user.active_team_id)
+  fetchProjects()
+}
+
+const filterMyOrganization = () => {
+  if (!auth.user?.organization_id) return
+
+  filters.value.organization_id = String(auth.user.organization_id)
+  fetchProjects()
+}
+
+const clearFilters = () => {
+  filters.value = {
+    status: '',
+    organization_id: '',
+    team_id: '',
+    category_id: '',
+  }
+  fetchProjects()
+}
+
+const showMyTeamFilter = () =>
+  auth.user?.role === ROLES.STUDENT && !!auth.user.active_team_id
+
+const showMyOrgFilter = () =>
+  [ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(auth.user?.role) &&
+  !!auth.user?.organization_id
 
 onMounted(fetchProjects)
 </script>
@@ -87,8 +119,23 @@ onMounted(fetchProjects)
         />
       </div>
 
-      <div class="col-auto">
+      <div class="col-auto d-flex gap-2 flex-wrap">
         <button class="btn btn-outline-primary" @click="fetchProjects">Filter</button>
+        <button
+          v-if="showMyTeamFilter()"
+          class="btn btn-outline-secondary"
+          @click="filterMyTeam"
+        >
+          My team projects
+        </button>
+        <button
+          v-if="showMyOrgFilter()"
+          class="btn btn-outline-secondary"
+          @click="filterMyOrganization"
+        >
+          My organization projects
+        </button>
+        <button class="btn btn-outline-secondary" @click="clearFilters">Clear</button>
       </div>
     </div>
 

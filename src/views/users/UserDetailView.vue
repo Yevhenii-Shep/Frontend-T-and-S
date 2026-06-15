@@ -5,9 +5,11 @@ import api from '@/api/axios'
 import { useAuthStore } from '@/stores/auth'
 import { ROLE_LABELS, ROLES } from '@/constants/roles'
 import {
+  canDeleteOwnAccount,
   canDeleteUser,
   canEditUser,
   canManageSubjectGrades,
+  canViewStudentSubjects,
   canViewUser,
   canViewUsers,
 } from '@/utils/userPermissions'
@@ -49,7 +51,7 @@ const fetchUser = async () => {
       return
     }
 
-    if (user.value.role === ROLES.STUDENT) {
+    if (canViewStudentSubjects(auth.user, user.value)) {
       const subjectsRes = await api.get(`/users/${user.value.id}/subjects`)
       subjects.value = apiList(subjectsRes)
     }
@@ -76,6 +78,18 @@ const handleDelete = async () => {
     router.push('/users')
   } catch (e: any) {
     alert(e?.response?.data?.message || 'Failed to delete user')
+  }
+}
+
+const deleteMyAccount = async () => {
+  if (!confirm('Deactivate your account? You will be logged out.')) return
+
+  try {
+    await api.delete('/users/me')
+    await auth.logout()
+    router.push('/login')
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to deactivate account')
   }
 }
 
@@ -224,7 +238,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="user.role === ROLES.STUDENT" class="card mb-3">
+      <div v-if="canViewStudentSubjects(auth.user, user)" class="card mb-3">
         <div class="card-body">
           <h5>Subjects</h5>
 
@@ -288,6 +302,17 @@ onMounted(async () => {
               Add
             </button>
           </div>
+        </div>
+      </div>
+
+      <div v-if="isSelf() && canDeleteOwnAccount(auth.user)" class="card border-danger mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="text-danger mb-1">My account</h5>
+            <small class="text-muted">Deactivating your account revokes all tokens</small>
+          </div>
+
+          <button class="btn btn-danger" @click="deleteMyAccount">Deactivate my account</button>
         </div>
       </div>
 

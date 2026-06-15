@@ -70,7 +70,7 @@ const createProject = async () => {
       deadline: form.value.deadline || null,
     }
 
-    if (form.value.team_id) {
+    if (!isStudent() && form.value.team_id) {
       payload.team_id = form.value.team_id
     }
 
@@ -99,9 +99,6 @@ onMounted(async () => {
       form.value.program_type = types[0]
     }
 
-    if (isStudent() && auth.user?.active_team_id) {
-      form.value.team_id = auth.user.active_team_id
-    }
   } finally {
     loading.value = false
   }
@@ -160,18 +157,11 @@ onMounted(async () => {
             </select>
           </div>
 
-          <div v-if="isStudent()" class="mb-3">
-            <label class="form-label">Team ID</label>
-            <input
-              v-model.number="form.team_id"
-              type="number"
-              class="form-control"
-              required
-            />
-            <small class="text-muted">Your active team is pre-filled if available</small>
+          <div v-if="isStudent()" class="alert alert-info py-2">
+            The project will be linked to your active team automatically.
           </div>
 
-          <div v-else-if="!isStudent()" class="mb-3">
+          <div v-else class="mb-3">
             <label class="form-label">Team ID</label>
             <input v-model.number="form.team_id" type="number" class="form-control" />
           </div>

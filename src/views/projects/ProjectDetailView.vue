@@ -15,12 +15,16 @@ import {
   canAdminAssignRelations,
   canAssignNtiMentor,
   canAssignOrganizationMentor,
+  canAssignOrganizationToProject,
+  canAssignTeamToProject,
   canDeleteProject,
   canEditProject,
   canModifyProjectChildren,
   canUpdateStatusOrDeadline,
+  canUploadProjectDocuments,
   canViewProject,
 } from '@/utils/projectPermissions'
+import { canViewUser } from '@/utils/userPermissions'
 
 const route = useRoute()
 const router = useRouter()
@@ -75,6 +79,7 @@ const participantForm = ref<Record<number, { user_id: number | null; role: numbe
 
 const isAllowed = computed(() => canViewProject(auth.user, project.value))
 const canWrite = computed(() => canModifyProjectChildren(auth.user, project.value))
+const canUpload = computed(() => canUploadProjectDocuments(auth.user, project.value))
 const isAdmin = () => auth.user?.role === ROLES.ADMIN
 
 const fetchProject = async () => {
@@ -163,6 +168,19 @@ const assignOrganization = async () => {
     await fetchProject()
   } catch (e: any) {
     alert(e?.response?.data?.message || 'Failed to assign organization')
+  }
+}
+
+const claimForMyOrganization = async () => {
+  if (!auth.user?.organization_id) return
+
+  try {
+    await api.patch(`/projects/${project.value.id}/assign-organization`, {
+      organization_id: auth.user.organization_id,
+    })
+    await fetchProject()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to claim project for your organization')
   }
 }
 
@@ -487,12 +505,11 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- admin assignments -->
-      <div v-if="canAdminAssignRelations(auth.user)" class="card mb-3">
+      <!-- team assignment -->
+      <div v-if="canAssignTeamToProject(auth.user, project)" class="card mb-3">
         <div class="card-body">
-          <h5>Assignments (Admin)</h5>
-          <p class="text-muted mb-2">Team ID:</p>
-          <div class="d-flex gap-2 mb-2">
+          <h5>Assign team</h5>
+          <div class="d-flex gap-2">
             <input
               v-model.number="assignTeamId"
               type="number"
@@ -501,21 +518,43 @@ onMounted(fetchProject)
             />
             <button class="btn btn-outline-primary btn-sm" @click="assignTeam">Assign team</button>
           </div>
+        </div>
+      </div>
 
-          <p class="text-muted mb-2">Organization ID:</p>
-          <div class="d-flex gap-2 mb-2">
-            <input
-              v-model.number="assignOrgId"
-              type="number"
-              class="form-control"
-              placeholder="Organization ID"
-            />
-            <button class="btn btn-outline-primary btn-sm" @click="assignOrganization">
-              Assign org
+      <!-- organization assignment -->
+      <div v-if="canAssignOrganizationToProject(auth.user, project)" class="card mb-3">
+        <div class="card-body">
+          <h5>Organization assignment</h5>
+
+          <template v-if="canAdminAssignRelations(auth.user)">
+            <div class="d-flex gap-2">
+              <input
+                v-model.number="assignOrgId"
+                type="number"
+                class="form-control"
+                placeholder="Organization ID"
+              />
+              <button class="btn btn-outline-primary btn-sm" @click="assignOrganization">
+                Assign org
+              </button>
+            </div>
+          </template>
+
+          <template v-else>
+            <p class="text-muted mb-2">
+              Claim this project for your organization to manage it.
+            </p>
+            <button class="btn btn-outline-primary btn-sm" @click="claimForMyOrganization">
+              Claim for my organization
             </button>
-          </div>
+          </template>
+        </div>
+      </div>
 
-          <p class="text-muted mb-2">Category ID:</p>
+      <!-- admin category -->
+      <div v-if="canAdminAssignRelations(auth.user)" class="card mb-3">
+        <div class="card-body">
+          <h5>Category (Admin)</h5>
           <div class="d-flex gap-2">
             <input
               v-model.number="assignCategoryId"
@@ -570,11 +609,36 @@ onMounted(fetchProject)
       <div class="card mb-3">
         <div class="card-body">
           <h5>Team</h5>
-          <td class="text-end">
-            <button class="btn btn-sm btn-primary" @click="goToTeam(project.team?.id)">
-              View team information
-            </button>
-          </td>
+          <p v-if="project.team_name" class="mb-2">
+            <strong>{{ project.team_name }}</strong>
+          </p>
+
+          <div v-if="project.team?.users?.length" class="mb-3">
+            <h6 class="mb-2">Members</h6>
+            <ul class="list-group">
+              <li
+                v-for="member in project.team.users"
+                :key="member.id"
+                class="list-group-item"
+              >
+                <RouterLink
+                  v-if="canViewUser(auth.user, member)"
+                  :to="`/users/${member.id}`"
+                >
+                  {{ member.name }}
+                </RouterLink>
+                <span v-else>{{ member.name }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <button
+            v-if="project.team?.id"
+            class="btn btn-sm btn-primary"
+            @click="goToTeam(project.team.id)"
+          >
+            View team information
+          </button>
         </div>
       </div>
 
@@ -614,7 +678,7 @@ onMounted(fetchProject)
 
           <div v-else class="text-muted mb-3">No documents</div>
 
-          <div v-if="canWrite" class="d-flex gap-2">
+          <div v-if="canUpload" class="d-flex gap-2">
             <input v-model="docName" class="form-control" placeholder="Name (optional)" />
             <input type="file" class="form-control" @change="onDocFileChange" />
             <button class="btn btn-primary btn-sm" :disabled="uploadingDoc" @click="uploadDocument">

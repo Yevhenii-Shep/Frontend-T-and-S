@@ -15,6 +15,10 @@ export const canViewProject = (user: any, project: any) => {
   }
 
   if (user.role === ROLES.STUDENT) {
+    if (project.team_id && user.active_team_id) {
+      return Number(project.team_id) === Number(user.active_team_id)
+    }
+
     return project.team?.users?.some((u: any) => u.id === user.id)
   }
 
@@ -87,6 +91,40 @@ export const canUpdateStatusOrDeadline = (user: any, project: any) => {
 
 export const canAdminAssignRelations = (user: any) => user?.role === ROLES.ADMIN
 
+export const canAssignTeamToProject = (user: any, project: any) => {
+  if (!user || !project) return false
+
+  if (user.role === ROLES.ADMIN) return true
+
+  if (user.role === ROLES.ORGANIZATION_ADMIN || user.role === ROLES.ORGANIZATION_EMPLOYEE) {
+    return canWriteProject(user, project)
+  }
+
+  return false
+}
+
+export const canAssignOrganizationToProject = (user: any, project: any) => {
+  if (!user || !project) return false
+
+  if (user.role === ROLES.ADMIN) return true
+
+  if (user.role === ROLES.ORGANIZATION_ADMIN || user.role === ROLES.ORGANIZATION_EMPLOYEE) {
+    if (!user.organization_id) return false
+
+    if (project.organization_id && project.organization_id !== user.organization_id) {
+      return false
+    }
+
+    if (project.organization_id === user.organization_id) {
+      return true
+    }
+
+    return project.program_type === 1
+  }
+
+  return false
+}
+
 export const canAssignNtiMentor = (user: any) => {
   if (!user) return false
 
@@ -106,3 +144,23 @@ export const canAssignOrganizationMentor = (user: any, project: any) => {
 }
 
 export const canModifyProjectChildren = (user: any, project: any) => canWriteProject(user, project)
+
+/** Загрузка документов: staff или студент команды проекта. */
+export const canUploadProjectDocuments = (user: any, project: any) => {
+  if (!user || !project) return false
+
+  if (canWriteProject(user, project)) return true
+
+  if (user.role === ROLES.STUDENT && project.team_id && user.active_team_id) {
+    return Number(project.team_id) === Number(user.active_team_id)
+  }
+
+  return false
+}
+
+export const isOrgRole = (user: any) =>
+  user &&
+  [ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(user.role) &&
+  user.organization_id
+
+export const isStudentRole = (user: any) => user?.role === ROLES.STUDENT

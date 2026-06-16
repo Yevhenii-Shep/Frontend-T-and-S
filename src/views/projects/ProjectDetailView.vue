@@ -16,12 +16,12 @@ import {
   canAssignNtiMentor,
   canAssignOrganizationMentor,
   canAssignOrganizationToProject,
-  canAssignTeamToProject,
   canDeleteProjectDocuments,
   canDeleteProject,
-  canEditProject,
   canEditProjectBaseInfo,
   canModifyProjectChildren,
+  canScheduleProjectAudit,
+  canSetAuditResult,
   canUpdateStatusOrDeadline,
   canUploadProjectDocuments,
   canViewProject,
@@ -42,7 +42,6 @@ const savingStatus = ref(false)
 const savingDeadline = ref(false)
 
 // admin assignments
-const assignTeamId = ref<number | null>(null)
 const assignOrgId = ref<number | null>(null)
 const assignCategoryId = ref<number | null>(null)
 const assignNtiMentorId = ref<number | null>(null)
@@ -83,7 +82,15 @@ const isAllowed = computed(() => canViewProject(auth.user, project.value))
 const canWrite = computed(() => canModifyProjectChildren(auth.user, project.value))
 const canUpload = computed(() => canUploadProjectDocuments(auth.user, project.value))
 const canDeleteDocuments = computed(() => canDeleteProjectDocuments(auth.user, project.value))
+const canScheduleAudit = computed(
+  () =>
+    canScheduleProjectAudit(auth.user, project.value) &&
+    project.value?.status === 0 &&
+    !(project.value?.audit_events?.length ?? 0),
+)
 const isAdmin = () => auth.user?.role === ROLES.ADMIN
+
+const isAuditEnded = (endTime: string) => new Date(endTime) <= new Date()
 
 const fetchProject = async () => {
   loading.value = true
@@ -93,7 +100,6 @@ const fetchProject = async () => {
     project.value = apiData(res)
     newStatus.value = project.value.status
     newDeadline.value = project.value.deadline || ''
-    assignTeamId.value = project.value.team_id
     assignOrgId.value = project.value.organization_id
     assignCategoryId.value = project.value.category_id
     assignNtiMentorId.value = project.value.mentor_from_nti
@@ -145,17 +151,6 @@ const updateDeadline = async () => {
     alert(e?.response?.data?.message || 'Failed to update deadline')
   } finally {
     savingDeadline.value = false
-  }
-}
-
-const assignTeam = async () => {
-  try {
-    await api.patch(`/projects/${project.value.id}/assign-team`, {
-      team_id: assignTeamId.value,
-    })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to assign team')
   }
 }
 
@@ -352,18 +347,12 @@ const createAudit = async () => {
   savingAudit.value = true
 
   try {
-    const payload: any = {
+    await api.post('/audit-events', {
       project_id: project.value.id,
       main_auditor: auditForm.value.main_auditor,
       start_time: auditForm.value.start_time,
       end_time: auditForm.value.end_time,
-    }
-
-    if (isAdmin() && auditForm.value.result) {
-      payload.result = auditForm.value.result
-    }
-
-    await api.post('/audit-events', payload)
+    })
 
     auditForm.value = { main_auditor: null, start_time: '', end_time: '', result: null }
     await fetchProject()
@@ -371,6 +360,19 @@ const createAudit = async () => {
     alert(e?.response?.data?.message || 'Failed to create audit')
   } finally {
     savingAudit.value = false
+  }
+}
+
+const setAuditResult = async (auditId: number, result: number) => {
+  const label = result === 1 ? 'accept' : 'decline'
+
+  if (!confirm(`Are you sure you want to ${label} this project based on the audit?`)) return
+
+  try {
+    await api.patch(`/audit-events/${auditId}`, { result })
+    await fetchProject()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to set audit result')
   }
 }
 
@@ -545,22 +547,6 @@ onMounted(fetchProject)
           >
             Open team page
           </button>
-        </div>
-      </div>
-
-      <!-- team assignment -->
-      <div v-if="canAssignTeamToProject(auth.user, project)" class="card mb-3">
-        <div class="card-body">
-          <h5>Assign team</h5>
-          <div class="d-flex gap-2">
-            <input
-              v-model.number="assignTeamId"
-              type="number"
-              class="form-control"
-              placeholder="Team ID"
-            />
-            <button class="btn btn-outline-primary btn-sm" @click="assignTeam">Assign team</button>
-          </div>
         </div>
       </div>
 
@@ -842,7 +828,16 @@ onMounted(fetchProject)
               <div class="card-body">
                 <div class="d-flex justify-content-between">
                   <div>
-                    <div><strong>Auditor:</strong> {{ audit.main_auditor_name || '-' }}</div>
+                    <div>
+                      <strong>Auditor:</strong>
+                      <RouterLink
+                        v-if="audit.main_auditor && canViewUser(auth.user, { id: audit.main_auditor })"
+                        :to="`/users/${audit.main_auditor}`"
+                      >
+                        {{ audit.main_auditor_name || audit.main_auditor }}
+                      </RouterLink>
+                      <span v-else>{{ audit.main_auditor_name || '-' }}</span>
+                    </div>
                     <div><strong>Start:</strong> {{ audit.start_time }}</div>
                     <div><strong>End:</strong> {{ audit.end_time }}</div>
                     <div>
@@ -852,11 +847,27 @@ onMounted(fetchProject)
                   </div>
 
                   <button
-                    v-if="canWrite"
+                    v-if="isAdmin()"
                     class="btn btn-sm btn-danger"
                     @click="deleteAudit(audit.id)"
                   >
                     Delete
+                  </button>
+                </div>
+
+                <div
+                  v-if="
+                    !audit.result &&
+                    isAuditEnded(audit.end_time) &&
+                    canSetAuditResult(auth.user, audit)
+                  "
+                  class="d-flex gap-2 mt-3"
+                >
+                  <button class="btn btn-success btn-sm" @click="setAuditResult(audit.id, 1)">
+                    Accept project
+                  </button>
+                  <button class="btn btn-outline-danger btn-sm" @click="setAuditResult(audit.id, 2)">
+                    Decline project
                   </button>
                 </div>
 
@@ -902,7 +913,7 @@ onMounted(fetchProject)
 
           <div v-else class="text-muted mb-3">No audit events</div>
 
-          <div v-if="canWrite">
+          <div v-if="canScheduleAudit">
             <h6>Schedule audit</h6>
             <div class="row g-2">
               <div class="col-md-3">
@@ -918,13 +929,6 @@ onMounted(fetchProject)
               </div>
               <div class="col-md-3">
                 <input v-model="auditForm.end_time" type="datetime-local" class="form-control" />
-              </div>
-              <div v-if="isAdmin()" class="col-md-3">
-                <select v-model.number="auditForm.result" class="form-select">
-                  <option :value="null">No result</option>
-                  <option :value="1">Accepted</option>
-                  <option :value="2">Declined</option>
-                </select>
               </div>
               <div class="col-auto">
                 <button class="btn btn-primary btn-sm" :disabled="savingAudit" @click="createAudit">

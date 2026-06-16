@@ -33,6 +33,8 @@ const programOptions = computed(() => creatableProgramTypes(auth.user))
 
 const isStudent = () => auth.user?.role === ROLES.STUDENT
 const isAdmin = () => auth.user?.role === ROLES.ADMIN
+const canCreateDoneStatus = () =>
+  auth.user?.role === ROLES.ADMIN || auth.user?.role === ROLES.NTI_EMPLOYEE
 
 const fetchCategories = async () => {
   const response = await api.get('/categories')
@@ -177,7 +179,7 @@ onMounted(async () => {
             <select v-model.number="form.status" class="form-select">
               <option :value="0">Pending</option>
               <option :value="1">Active</option>
-              <option :value="2">Done</option>
+              <option v-if="canCreateDoneStatus()" :value="2">Done</option>
             </select>
           </div>
 

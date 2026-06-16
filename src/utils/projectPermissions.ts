@@ -175,6 +175,19 @@ export const canUploadProjectDocuments = (user: any, project: any) => {
   return false
 }
 
+/** Удаление документов: staff или студент команды проекта. */
+export const canDeleteProjectDocuments = (user: any, project: any) => {
+  if (!user || !project) return false
+
+  if (canWriteProject(user, project)) return true
+
+  if (user.role === ROLES.STUDENT && project.team_id && user.active_team_id) {
+    return Number(project.team_id) === Number(user.active_team_id)
+  }
+
+  return false
+}
+
 export const isOrgRole = (user: any) =>
   user &&
   [ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(user.role) &&

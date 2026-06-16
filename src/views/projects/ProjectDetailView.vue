@@ -17,6 +17,7 @@ import {
   canAssignOrganizationMentor,
   canAssignOrganizationToProject,
   canAssignTeamToProject,
+  canDeleteProjectDocuments,
   canDeleteProject,
   canEditProject,
   canEditProjectBaseInfo,
@@ -81,6 +82,7 @@ const participantForm = ref<Record<number, { user_id: number | null; role: numbe
 const isAllowed = computed(() => canViewProject(auth.user, project.value))
 const canWrite = computed(() => canModifyProjectChildren(auth.user, project.value))
 const canUpload = computed(() => canUploadProjectDocuments(auth.user, project.value))
+const canDeleteDocuments = computed(() => canDeleteProjectDocuments(auth.user, project.value))
 const isAdmin = () => auth.user?.role === ROLES.ADMIN
 
 const fetchProject = async () => {
@@ -667,7 +669,7 @@ onMounted(fetchProject)
                   </button>
 
                   <button
-                    v-if="canWrite"
+                    v-if="canDeleteDocuments"
                     class="btn btn-sm btn-danger"
                     @click="deleteDocument(doc.id)"
                   >

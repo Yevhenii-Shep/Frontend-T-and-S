@@ -10,7 +10,8 @@ import {
   PROGRAM_TYPE_LABELS,
   PROJECT_STATUS_LABELS,
 } from '@/constants/project'
-import { apiData } from '@/utils/apiHelpers'
+import { ROLE_LABELS } from '@/constants/roles'
+import { apiData, apiList } from '@/utils/apiHelpers'
 import {
   canAdminAssignRelations,
   canAssignNtiMentor,
@@ -20,8 +21,10 @@ import {
   canDeleteProject,
   canEditProjectBaseInfo,
   canModifyProjectChildren,
+  canOrgAcceptProjectAfterAudit,
   canScheduleProjectAudit,
   canSetAuditResult,
+  getAuditMainAuditorId,
   canUpdateStatusOrDeadline,
   canUploadProjectDocuments,
   canViewProject,
@@ -77,6 +80,7 @@ const auditForm = ref({
 })
 const savingAudit = ref(false)
 const participantForm = ref<Record<number, { user_id: number | null; role: number }>>({})
+const auditorCandidates = ref<any[]>([])
 
 const isAllowed = computed(() => canViewProject(auth.user, project.value))
 const canWrite = computed(() => canModifyProjectChildren(auth.user, project.value))
@@ -90,7 +94,42 @@ const canScheduleAudit = computed(
 )
 const isAdmin = () => auth.user?.role === ROLES.ADMIN
 
-const isAuditEnded = (endTime: string) => new Date(endTime) <= new Date()
+const isAuditEnded = (endTime: string) => {
+  if (!endTime) return false
+
+  const normalized = endTime.includes('T') ? endTime : endTime.replace(' ', 'T')
+  const end = new Date(normalized)
+
+  return !Number.isNaN(end.getTime()) && end <= new Date()
+}
+
+const loadAuditorCandidates = async () => {
+  if (!canScheduleProjectAudit(auth.user, project.value)) {
+    auditorCandidates.value = []
+    return
+  }
+
+  if (project.value?.status !== 0 || (project.value?.audit_events?.length ?? 0) > 0) {
+    auditorCandidates.value = []
+    return
+  }
+
+  try {
+    const res = await api.get('/users')
+    auditorCandidates.value = apiList(res).filter((user: any) => {
+      if ([ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(user.role)) {
+        return true
+      }
+
+      return (
+        [ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(user.role) &&
+        !!user.organization_id
+      )
+    })
+  } catch {
+    auditorCandidates.value = []
+  }
+}
 
 const fetchProject = async () => {
   loading.value = true
@@ -110,6 +149,7 @@ const fetchProject = async () => {
       forms[audit.id] = { user_id: null, role: 1 }
     }
     participantForm.value = forms
+    await loadAuditorCandidates()
   } finally {
     loading.value = false
   }
@@ -179,6 +219,28 @@ const claimForMyOrganization = async () => {
     await fetchProject()
   } catch (e: any) {
     alert(e?.response?.data?.message || 'Failed to claim project for your organization')
+  }
+}
+
+const acceptProjectAfterAudit = async () => {
+  if (!confirm('Accept this project for your organization? The project will become Active.')) return
+
+  try {
+    await api.patch(`/projects/${project.value.id}/accept-after-audit`)
+    await fetchProject()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to accept project after audit')
+  }
+}
+
+const declineProjectAfterAudit = async () => {
+  if (!confirm('Decline this project? It will remain Pending.')) return
+
+  try {
+    await api.patch(`/projects/${project.value.id}/decline-after-audit`)
+    await fetchProject()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to decline project after audit')
   }
 }
 
@@ -364,12 +426,15 @@ const createAudit = async () => {
 }
 
 const setAuditResult = async (auditId: number, result: number) => {
-  const label = result === 1 ? 'accept' : 'decline'
+  const isAccepted = result === 1
+  const label = isAccepted ? 'accept' : 'decline'
 
-  if (!confirm(`Are you sure you want to ${label} this project based on the audit?`)) return
+  if (!confirm(`Set audit result to "${label}"? The project status will not change until the organization decides.`)) {
+    return
+  }
 
   try {
-    await api.patch(`/audit-events/${auditId}`, { result })
+    await api.patch(`/audit-events/${auditId}/result`, { result })
     await fetchProject()
   } catch (e: any) {
     alert(e?.response?.data?.message || 'Failed to set audit result')
@@ -551,29 +616,65 @@ onMounted(fetchProject)
       </div>
 
       <!-- organization assignment -->
-      <div v-if="canAssignOrganizationToProject(auth.user, project)" class="card mb-3">
+      <div
+        v-if="
+          canAssignOrganizationToProject(auth.user, project) ||
+          canOrgAcceptProjectAfterAudit(auth.user, project)
+        "
+        class="card mb-3"
+      >
         <div class="card-body">
           <h5>Organization assignment</h5>
 
-          <template v-if="canAdminAssignRelations(auth.user)">
+          <p
+            v-if="
+              !canOrgAcceptProjectAfterAudit(auth.user, project) &&
+              canAssignOrganizationToProject(auth.user, project) &&
+              !canAdminAssignRelations(auth.user)
+            "
+            class="alert alert-info small py-2 mb-3"
+            role="alert"
+          >
+            A project can only be accepted (status Active) after a successful audit. Claiming
+            links your organization to the project but does not change its status.
+          </p>
+
+          <div v-if="canOrgAcceptProjectAfterAudit(auth.user, project)" class="mb-3">
+            <p class="text-muted mb-2">
+              Audit passed successfully. Your organization can accept the project (Active) or
+              decline it (stays Pending).
+            </p>
             <div class="d-flex gap-2">
-              <input
-                v-model.number="assignOrgId"
-                type="number"
-                class="form-control"
-                placeholder="Organization ID"
-              />
-              <button class="btn btn-outline-primary btn-sm" @click="assignOrganization">
-                Assign org
+              <button class="btn btn-success btn-sm" @click="acceptProjectAfterAudit">
+                Accept project
+              </button>
+              <button class="btn btn-outline-danger btn-sm" @click="declineProjectAfterAudit">
+                Decline project
               </button>
             </div>
-          </template>
+          </div>
 
-          <template v-else>
-            <p class="text-muted mb-2">Claim this project for your organization to manage it.</p>
-            <button class="btn btn-outline-primary btn-sm" @click="claimForMyOrganization">
-              Claim for my organization
-            </button>
+          <template v-else-if="canAssignOrganizationToProject(auth.user, project)">
+            <template v-if="canAdminAssignRelations(auth.user)">
+              <div class="d-flex gap-2">
+                <input
+                  v-model.number="assignOrgId"
+                  type="number"
+                  class="form-control"
+                  placeholder="Organization ID"
+                />
+                <button class="btn btn-outline-primary btn-sm" @click="assignOrganization">
+                  Assign org
+                </button>
+              </div>
+            </template>
+
+            <template v-else>
+              <p class="text-muted mb-2">Claim this project for your organization to manage it.</p>
+              <button class="btn btn-outline-primary btn-sm" @click="claimForMyOrganization">
+                Claim for my organization
+              </button>
+            </template>
           </template>
         </div>
       </div>
@@ -831,10 +932,13 @@ onMounted(fetchProject)
                     <div>
                       <strong>Auditor:</strong>
                       <RouterLink
-                        v-if="audit.main_auditor && canViewUser(auth.user, { id: audit.main_auditor })"
-                        :to="`/users/${audit.main_auditor}`"
+                        v-if="
+                          getAuditMainAuditorId(audit) &&
+                          canViewUser(auth.user, { id: getAuditMainAuditorId(audit) })
+                        "
+                        :to="`/users/${getAuditMainAuditorId(audit)}`"
                       >
-                        {{ audit.main_auditor_name || audit.main_auditor }}
+                        {{ audit.main_auditor_name || audit.main_auditor?.name || '-' }}
                       </RouterLink>
                       <span v-else>{{ audit.main_auditor_name || '-' }}</span>
                     </div>
@@ -857,18 +961,31 @@ onMounted(fetchProject)
 
                 <div
                   v-if="
-                    !audit.result &&
+                    audit.result == null &&
                     isAuditEnded(audit.end_time) &&
                     canSetAuditResult(auth.user, audit)
                   "
-                  class="d-flex gap-2 mt-3"
+                  class="mt-3"
                 >
-                  <button class="btn btn-success btn-sm" @click="setAuditResult(audit.id, 1)">
-                    Accept project
-                  </button>
-                  <button class="btn btn-outline-danger btn-sm" @click="setAuditResult(audit.id, 2)">
-                    Decline project
-                  </button>
+                  <p class="text-muted small mb-2">
+                    As the main auditor, set the audit result only. The organization will decide
+                    whether to accept the project.
+                  </p>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-success btn-sm" @click="setAuditResult(audit.id, 1)">
+                      Accept audit
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" @click="setAuditResult(audit.id, 2)">
+                      Decline audit
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-else-if="audit.result && isAuditEnded(audit.end_time) && Number(audit.result) === 2"
+                  class="alert alert-warning mt-3 mb-0"
+                >
+                  Audit was declined. The project remains Pending.
                 </div>
 
                 <div v-if="audit.participants?.length" class="mt-3">
@@ -915,14 +1032,15 @@ onMounted(fetchProject)
 
           <div v-if="canScheduleAudit">
             <h6>Schedule audit</h6>
+            <p class="text-muted small mb-2">Select the main auditor and audit period.</p>
             <div class="row g-2">
-              <div class="col-md-3">
-                <input
-                  v-model.number="auditForm.main_auditor"
-                  type="number"
-                  class="form-control"
-                  placeholder="Main auditor user ID"
-                />
+              <div class="col-md-4">
+                <select v-model.number="auditForm.main_auditor" class="form-select">
+                  <option :value="null" disabled>Select main auditor</option>
+                  <option v-for="user in auditorCandidates" :key="user.id" :value="user.id">
+                    {{ user.name }} ({{ ROLE_LABELS[user.role] || user.role }})
+                  </option>
+                </select>
               </div>
               <div class="col-md-3">
                 <input v-model="auditForm.start_time" type="datetime-local" class="form-control" />
@@ -931,12 +1049,23 @@ onMounted(fetchProject)
                 <input v-model="auditForm.end_time" type="datetime-local" class="form-control" />
               </div>
               <div class="col-auto">
-                <button class="btn btn-primary btn-sm" :disabled="savingAudit" @click="createAudit">
+                <button
+                  class="btn btn-primary btn-sm"
+                  :disabled="savingAudit || !auditForm.main_auditor"
+                  @click="createAudit"
+                >
                   Schedule
                 </button>
               </div>
             </div>
           </div>
+
+          <p
+            v-else-if="project.status === 0 && !(project.audit_events?.length ?? 0)"
+            class="text-muted small mb-0"
+          >
+            Only NTI staff or admin can schedule an audit for this project.
+          </p>
         </div>
       </div>
 

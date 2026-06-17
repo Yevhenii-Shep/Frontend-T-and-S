@@ -25,7 +25,6 @@ const form = ref({
   organization_id: null as number | null,
   program_type: null as number | null,
   category_id: null as number | null,
-  status: 0,
   deadline: '',
 })
 
@@ -33,8 +32,6 @@ const programOptions = computed(() => creatableProgramTypes(auth.user))
 
 const isStudent = () => auth.user?.role === ROLES.STUDENT
 const isAdmin = () => auth.user?.role === ROLES.ADMIN
-const canCreateDoneStatus = () =>
-  auth.user?.role === ROLES.ADMIN || auth.user?.role === ROLES.NTI_EMPLOYEE
 
 const fetchCategories = async () => {
   const response = await api.get('/categories')
@@ -68,7 +65,6 @@ const createProject = async () => {
       description: form.value.description || null,
       program_type: form.value.program_type,
       category_id: form.value.category_id,
-      status: form.value.status,
       deadline: form.value.deadline || null,
     }
 
@@ -82,7 +78,8 @@ const createProject = async () => {
 
     const response = await api.post('/projects', payload)
 
-    router.push(`/projects/${apiData<{ id: number }>(response).id}`)
+    const created = apiData<{ id: number; slug?: string }>(response)
+    router.push(`/projects/${created.slug || created.id}`)
   } catch (e: any) {
     error.value = e?.response?.data?.message || e?.message || 'Failed to create project'
   } finally {
@@ -174,13 +171,8 @@ onMounted(async () => {
             <input v-model.number="form.organization_id" type="number" class="form-control" />
           </div>
 
-          <div class="mb-3">
-            <label class="form-label">Status</label>
-            <select v-model.number="form.status" class="form-select">
-              <option :value="0">Pending</option>
-              <option :value="1">Active</option>
-              <option v-if="canCreateDoneStatus()" :value="2">Done</option>
-            </select>
+          <div class="alert alert-info py-2">
+            New projects are always created with status <strong>Pending</strong>.
           </div>
 
           <div class="mb-3">

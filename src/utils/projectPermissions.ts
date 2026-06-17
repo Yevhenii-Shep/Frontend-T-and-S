@@ -1,6 +1,9 @@
 import { ROLES } from '@/constants/roles'
 
 const PROJECT_STATUS_INACTIVE = 3
+const PROJECT_STATUS_PENDING = 0
+const AUDIT_RESULT_ACCEPTED = 1
+const AUDIT_RESULT_DECLINED = 2
 
 export const canViewProject = (user: any, project: any) => {
   if (!user || !project) return false
@@ -158,23 +161,30 @@ export const canAssignOrganizationMentor = (user: any, project: any) => {
 
 export const canModifyProjectChildren = (user: any, project: any) => canWriteProject(user, project)
 
-/** Первый аудит: admin, NTI или org admin. */
-export const canScheduleProjectAudit = (user: any, project: any) => {
-  if (!user || !project) return false
+/** Назначить аудит: admin или сотрудник NTI. */
+export const canScheduleProjectAudit = (user: any, _project?: any) => {
+  if (!user) return false
 
-  if (user.role === ROLES.ADMIN || user.role === ROLES.NTI_EMPLOYEE) {
-    return true
+  return [ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(user.role)
+}
+
+/** ID главного аудитора из ответа API (main_auditor_id или вложенный main_auditor). */
+export const getAuditMainAuditorId = (audit: any): number | null => {
+  if (!audit) return null
+
+  if (audit.main_auditor_id != null) {
+    return Number(audit.main_auditor_id)
   }
 
-  if (user.role === ROLES.ORGANIZATION_ADMIN && user.organization_id) {
-    if (project.organization_id && project.organization_id === user.organization_id) {
-      return true
-    }
-
-    return project.program_type === 1
+  if (audit.main_auditor && typeof audit.main_auditor === 'object' && audit.main_auditor.id != null) {
+    return Number(audit.main_auditor.id)
   }
 
-  return false
+  if (audit.main_auditor != null && typeof audit.main_auditor !== 'object') {
+    return Number(audit.main_auditor)
+  }
+
+  return null
 }
 
 /** Главный аудитор выставляет итог после завершения аудита. */
@@ -183,7 +193,55 @@ export const canSetAuditResult = (user: any, audit: any) => {
 
   if (user.role === ROLES.ADMIN) return true
 
-  return audit.main_auditor === user.id
+  const auditorId = getAuditMainAuditorId(audit)
+
+  return auditorId !== null && auditorId === Number(user.id)
+}
+
+/** Завершённый аудит с итогом. */
+export const getCompletedAudit = (project: any) => {
+  if (!project?.audit_events?.length) return null
+
+  const now = Date.now()
+
+  return (
+    project.audit_events.find((audit: any) => {
+      if (!audit.result || !audit.end_time) return false
+
+      return new Date(audit.end_time).getTime() <= now
+    }) ?? null
+  )
+}
+
+/** Org может принять/отклонить проект после итога аудита. */
+export const canOrgDecideProjectAfterAudit = (user: any, project: any) => {
+  if (!isOrgRole(user) || !project) return false
+  if (!canAssignOrganizationToProject(user, project)) return false
+  if (project.status !== PROJECT_STATUS_PENDING) return false
+
+  return !!getCompletedAudit(project)
+}
+
+/** Принять проект: аудит Accepted, проект Pending → Active. */
+export const canOrgAcceptProjectAfterAudit = (user: any, project: any) => {
+  const audit = getCompletedAudit(project)
+
+  return (
+    canOrgDecideProjectAfterAudit(user, project) &&
+    audit &&
+    Number(audit.result) === AUDIT_RESULT_ACCEPTED
+  )
+}
+
+/** Отклонить проект после успешного аудита — остаётся Pending. */
+export const canOrgDeclineProjectAfterAudit = (user: any, project: any) =>
+  canOrgAcceptProjectAfterAudit(user, project)
+
+/** Аудит завершён с отказом — проект остаётся Pending, org не действует. */
+export const isAuditDeclinedForProject = (project: any) => {
+  const audit = getCompletedAudit(project)
+
+  return audit && Number(audit.result) === AUDIT_RESULT_DECLINED
 }
 
 /** Загрузка документов: staff или студент команды проекта. */

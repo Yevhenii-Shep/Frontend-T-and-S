@@ -41,11 +41,7 @@ export const canCreateProject = (user: any) => {
     return !!user.organization_id
   }
 
-  return [
-    ROLES.ADMIN,
-    ROLES.ORGANIZATION_ADMIN,
-    ROLES.NTI_EMPLOYEE,
-  ].includes(user.role)
+  return [ROLES.ADMIN, ROLES.ORGANIZATION_ADMIN, ROLES.NTI_EMPLOYEE].includes(user.role)
 }
 
 export const creatableProgramTypes = (user: any): number[] => {
@@ -183,7 +179,11 @@ export const getAuditMainAuditorId = (audit: any): number | null => {
     return Number(audit.main_auditor_id)
   }
 
-  if (audit.main_auditor && typeof audit.main_auditor === 'object' && audit.main_auditor.id != null) {
+  if (
+    audit.main_auditor &&
+    typeof audit.main_auditor === 'object' &&
+    audit.main_auditor.id != null
+  ) {
     return Number(audit.main_auditor.id)
   }
 
@@ -215,7 +215,8 @@ export const getCompletedAudit = (project: any) => {
     project.audit_events.find((audit: any) => {
       if (!audit.result || !audit.end_time) return false
 
-      return new Date(audit.end_time).getTime() <= now
+      return (audit.status = AUDIT_RESULT_ACCEPTED)
+      // return new Date(audit.end_time).getTime() <= now
     }) ?? null
   )
 }

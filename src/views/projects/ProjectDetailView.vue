@@ -96,12 +96,15 @@ const canScheduleAudit = computed(
 const isAdmin = () => auth.user?.role === ROLES.ADMIN
 
 const isAuditEnded = (endTime: string) => {
+  return true
+  /*
   if (!endTime) return false
 
   const normalized = endTime.includes('T') ? endTime : endTime.replace(' ', 'T')
   const end = new Date(normalized)
 
   return !Number.isNaN(end.getTime()) && end <= new Date()
+  */
 }
 
 const loadAuditorCandidates = async () => {
@@ -417,7 +420,11 @@ const setAuditResult = async (auditId: number, result: number) => {
   const isAccepted = result === 1
   const label = isAccepted ? 'accept' : 'decline'
 
-  if (!confirm(`Set audit result to "${label}"? The project status will not change until the organization decides.`)) {
+  if (
+    !confirm(
+      `Set audit result to "${label}"? The project status will not change until the organization decides.`,
+    )
+  ) {
     return
   }
 
@@ -639,7 +646,12 @@ onMounted(fetchProject)
             <strong>Accepted</strong>.
           </p>
 
-          <template v-else-if="canAdminAssignRelations(auth.user) && canAssignOrganizationToProject(auth.user, project)">
+          <template
+            v-else-if="
+              canAdminAssignRelations(auth.user) &&
+              canAssignOrganizationToProject(auth.user, project)
+            "
+          >
             <div class="d-flex gap-2">
               <input
                 v-model.number="assignOrgId"
@@ -951,14 +963,19 @@ onMounted(fetchProject)
                     <button class="btn btn-success btn-sm" @click="setAuditResult(audit.id, 1)">
                       Accept audit
                     </button>
-                    <button class="btn btn-outline-danger btn-sm" @click="setAuditResult(audit.id, 2)">
+                    <button
+                      class="btn btn-outline-danger btn-sm"
+                      @click="setAuditResult(audit.id, 2)"
+                    >
                       Decline audit
                     </button>
                   </div>
                 </div>
 
                 <div
-                  v-else-if="audit.result && isAuditEnded(audit.end_time) && Number(audit.result) === 2"
+                  v-else-if="
+                    audit.result && isAuditEnded(audit.end_time) && Number(audit.result) === 2
+                  "
                   class="alert alert-warning mt-3 mb-0"
                 >
                   Audit was declined. The project remains Pending.

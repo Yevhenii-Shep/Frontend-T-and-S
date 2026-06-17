@@ -141,6 +141,13 @@ export const canAssignOrganizationToProject = (user: any, project: any) => {
   return false
 }
 
+/** Org видит блок назначения org на pending-проекте с доступом. */
+export const canOrgViewProjectAssignmentSection = (user: any, project: any) =>
+  isOrgRole(user) &&
+  !!project &&
+  project.status === PROJECT_STATUS_PENDING &&
+  canAssignOrganizationToProject(user, project)
+
 export const canAssignNtiMentor = (user: any) => {
   if (!user) return false
 

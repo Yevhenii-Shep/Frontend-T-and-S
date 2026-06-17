@@ -22,6 +22,7 @@ import {
   canEditProjectBaseInfo,
   canModifyProjectChildren,
   canOrgAcceptProjectAfterAudit,
+  canOrgViewProjectAssignmentSection,
   canScheduleProjectAudit,
   canSetAuditResult,
   getAuditMainAuditorId,
@@ -206,19 +207,6 @@ const assignOrganization = async () => {
     await fetchProject()
   } catch (e: any) {
     alert(e?.response?.data?.message || 'Failed to assign organization')
-  }
-}
-
-const claimForMyOrganization = async () => {
-  if (!auth.user?.organization_id) return
-
-  try {
-    await api.patch(`/projects/${project.value.id}/assign-organization`, {
-      organization_id: auth.user.organization_id,
-    })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to claim project for your organization')
   }
 }
 
@@ -618,35 +606,23 @@ onMounted(fetchProject)
       <!-- organization assignment -->
       <div
         v-if="
-          canAssignOrganizationToProject(auth.user, project) ||
-          canOrgAcceptProjectAfterAudit(auth.user, project)
+          canOrgAcceptProjectAfterAudit(auth.user, project) ||
+          canOrgViewProjectAssignmentSection(auth.user, project) ||
+          (canAdminAssignRelations(auth.user) && canAssignOrganizationToProject(auth.user, project))
         "
         class="card mb-3"
       >
         <div class="card-body">
           <h5>Organization assignment</h5>
 
-          <p
-            v-if="
-              !canOrgAcceptProjectAfterAudit(auth.user, project) &&
-              canAssignOrganizationToProject(auth.user, project) &&
-              !canAdminAssignRelations(auth.user)
-            "
-            class="alert alert-info small py-2 mb-3"
-            role="alert"
-          >
-            A project can only be accepted (status Active) after a successful audit. Claiming
-            links your organization to the project but does not change its status.
-          </p>
-
           <div v-if="canOrgAcceptProjectAfterAudit(auth.user, project)" class="mb-3">
             <p class="text-muted mb-2">
-              Audit passed successfully. Your organization can accept the project (Active) or
-              decline it (stays Pending).
+              The audit was accepted. Your organization can take this project (Active) or decline it
+              (stays Pending).
             </p>
             <div class="d-flex gap-2">
               <button class="btn btn-success btn-sm" @click="acceptProjectAfterAudit">
-                Accept project
+                Claim for my organization
               </button>
               <button class="btn btn-outline-danger btn-sm" @click="declineProjectAfterAudit">
                 Decline project
@@ -654,27 +630,27 @@ onMounted(fetchProject)
             </div>
           </div>
 
-          <template v-else-if="canAssignOrganizationToProject(auth.user, project)">
-            <template v-if="canAdminAssignRelations(auth.user)">
-              <div class="d-flex gap-2">
-                <input
-                  v-model.number="assignOrgId"
-                  type="number"
-                  class="form-control"
-                  placeholder="Organization ID"
-                />
-                <button class="btn btn-outline-primary btn-sm" @click="assignOrganization">
-                  Assign org
-                </button>
-              </div>
-            </template>
+          <p
+            v-else-if="canOrgViewProjectAssignmentSection(auth.user, project)"
+            class="alert alert-info small py-2 mb-0"
+            role="alert"
+          >
+            You can claim this project for your organization only after the audit ends with result
+            <strong>Accepted</strong>.
+          </p>
 
-            <template v-else>
-              <p class="text-muted mb-2">Claim this project for your organization to manage it.</p>
-              <button class="btn btn-outline-primary btn-sm" @click="claimForMyOrganization">
-                Claim for my organization
+          <template v-else-if="canAdminAssignRelations(auth.user) && canAssignOrganizationToProject(auth.user, project)">
+            <div class="d-flex gap-2">
+              <input
+                v-model.number="assignOrgId"
+                type="number"
+                class="form-control"
+                placeholder="Organization ID"
+              />
+              <button class="btn btn-outline-primary btn-sm" @click="assignOrganization">
+                Assign org
               </button>
-            </template>
+            </div>
           </template>
         </div>
       </div>

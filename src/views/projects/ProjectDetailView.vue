@@ -17,18 +17,18 @@ import {
   canAssignNtiMentor,
   canAssignOrganizationMentor,
   canAssignOrganizationToProject,
-  canDeleteProjectDocuments,
+  canAssignTeamToProject,
   canDeleteProject,
   canEditProjectBaseInfo,
-  canModifyProjectChildren,
+  canManageProjectDocuments,
   canOrgAcceptProjectAfterAudit,
   canOrgViewProjectAssignmentSection,
   canScheduleProjectAudit,
   canSetAuditResult,
   getAuditMainAuditorId,
   canUpdateStatusOrDeadline,
-  canUploadProjectDocuments,
   canViewProject,
+  canWriteProject,
 } from '@/utils/projectPermissions'
 import { canViewUser } from '@/utils/userPermissions'
 
@@ -50,6 +50,8 @@ const assignOrgId = ref<number | null>(null)
 const assignCategoryId = ref<number | null>(null)
 const assignNtiMentorId = ref<number | null>(null)
 const assignOrgMentorId = ref<number | null>(null)
+const assignTeamId = ref<number | null>(null)
+const teamCandidates = ref<any[]>([])
 
 // document
 const docFile = ref<File | null>(null)
@@ -84,9 +86,8 @@ const participantForm = ref<Record<number, { user_id: number | null; role: numbe
 const auditorCandidates = ref<any[]>([])
 
 const isAllowed = computed(() => canViewProject(auth.user, project.value))
-const canWrite = computed(() => canModifyProjectChildren(auth.user, project.value))
-const canUpload = computed(() => canUploadProjectDocuments(auth.user, project.value))
-const canDeleteDocuments = computed(() => canDeleteProjectDocuments(auth.user, project.value))
+const canWrite = computed(() => canWriteProject(auth.user, project.value))
+const canManageDocuments = computed(() => canManageProjectDocuments(auth.user, project.value))
 const canScheduleAudit = computed(
   () =>
     canScheduleProjectAudit(auth.user, project.value) &&
@@ -147,6 +148,7 @@ const fetchProject = async () => {
     assignCategoryId.value = project.value.category_id
     assignNtiMentorId.value = project.value.mentor_from_nti
     assignOrgMentorId.value = project.value.mentor_from_organization
+    assignTeamId.value = project.value.team_id
 
     const forms: Record<number, { user_id: number | null; role: number }> = {}
     for (const audit of project.value.audit_events ?? []) {
@@ -154,6 +156,7 @@ const fetchProject = async () => {
     }
     participantForm.value = forms
     await loadAuditorCandidates()
+    await loadTeamCandidates()
   } finally {
     loading.value = false
   }
@@ -195,6 +198,31 @@ const updateDeadline = async () => {
     alert(e?.response?.data?.message || 'Failed to update deadline')
   } finally {
     savingDeadline.value = false
+  }
+}
+
+const loadTeamCandidates = async () => {
+  if (!canAssignTeamToProject(auth.user, project.value)) {
+    teamCandidates.value = []
+    return
+  }
+
+  try {
+    const res = await api.get('/teams')
+    teamCandidates.value = apiList(res)
+  } catch {
+    teamCandidates.value = []
+  }
+}
+
+const assignTeam = async () => {
+  try {
+    await api.patch(`/projects/${project.value.id}/assign-team`, {
+      team_id: assignTeamId.value,
+    })
+    await fetchProject()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to assign team')
   }
 }
 
@@ -607,6 +635,19 @@ onMounted(fetchProject)
           >
             Open team page
           </button>
+
+          <div v-if="canAssignTeamToProject(auth.user, project)" class="mt-3">
+            <p class="text-muted small mb-2">Assign or change the project team (program B only).</p>
+            <div class="d-flex gap-2">
+              <select v-model.number="assignTeamId" class="form-select">
+                <option :value="null">No team</option>
+                <option v-for="team in teamCandidates" :key="team.id" :value="team.id">
+                  {{ team.name }}
+                </option>
+              </select>
+              <button class="btn btn-outline-primary btn-sm" @click="assignTeam">Assign team</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -744,7 +785,7 @@ onMounted(fetchProject)
                   </button>
 
                   <button
-                    v-if="canDeleteDocuments"
+                    v-if="canManageDocuments"
                     class="btn btn-sm btn-danger"
                     @click="deleteDocument(doc.id)"
                   >
@@ -757,7 +798,7 @@ onMounted(fetchProject)
 
           <div v-else class="text-muted mb-3">No documents</div>
 
-          <div v-if="canUpload" class="d-flex gap-2">
+          <div v-if="canManageDocuments" class="d-flex gap-2">
             <input v-model="docName" class="form-control" placeholder="Name (optional)" />
             <input type="file" class="form-control" @change="onDocFileChange" />
             <button class="btn btn-primary btn-sm" :disabled="uploadingDoc" @click="uploadDocument">

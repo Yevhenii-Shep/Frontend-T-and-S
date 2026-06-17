@@ -1,9 +1,12 @@
 import { ROLES } from '@/constants/roles'
+import { PROGRAM_TYPE } from '@/constants/project'
 
 const PROJECT_STATUS_INACTIVE = 3
 const PROJECT_STATUS_PENDING = 0
 const AUDIT_RESULT_ACCEPTED = 1
 const AUDIT_RESULT_DECLINED = 2
+
+// --- Просмотр и создание проекта ---
 
 export const canViewProject = (user: any, project: any) => {
   if (!user || !project) return false
@@ -58,6 +61,8 @@ export const creatableProgramTypes = (user: any): number[] => {
   return [1, 2]
 }
 
+// --- Изменение проекта и назначения ---
+
 export const canWriteProject = (user: any, project: any) => {
   if (!user || !project) return false
 
@@ -70,8 +75,6 @@ export const canWriteProject = (user: any, project: any) => {
 
   return false
 }
-
-export const canEditProject = (user: any, project: any) => canWriteProject(user, project)
 
 export const canEditProjectBaseInfo = (user: any, project: any) => {
   if (!user || !project) return false
@@ -112,8 +115,13 @@ export const canUpdateStatusOrDeadline = (user: any, project: any) => {
 
 export const canAdminAssignRelations = (user: any) => user?.role === ROLES.ADMIN
 
-/** Команда проекта не меняется после создания. */
-export const canAssignTeamToProject = () => false
+/** Program B: admin и NTI могут назначать и менять команду проекта. */
+export const canAssignTeamToProject = (user: any, project: any) => {
+  if (!user || !project) return false
+  if (project.program_type !== PROGRAM_TYPE.B) return false
+
+  return [ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(user.role)
+}
 
 export const canAssignOrganizationToProject = (user: any, project: any) => {
   if (!user || !project) return false
@@ -162,14 +170,14 @@ export const canAssignOrganizationMentor = (user: any, project: any) => {
   )
 }
 
-export const canModifyProjectChildren = (user: any, project: any) => canWriteProject(user, project)
-
 /** Назначить аудит: admin или сотрудник NTI. */
 export const canScheduleProjectAudit = (user: any, _project?: any) => {
   if (!user) return false
 
   return [ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(user.role)
 }
+
+// --- Аудит и решение org после аудита ---
 
 /** ID главного аудитора из ответа API (main_auditor_id или вложенный main_auditor). */
 export const getAuditMainAuditorId = (audit: any): number | null => {
@@ -241,32 +249,8 @@ export const canOrgAcceptProjectAfterAudit = (user: any, project: any) => {
   )
 }
 
-/** Отклонить проект после успешного аудита — остаётся Pending. */
-export const canOrgDeclineProjectAfterAudit = (user: any, project: any) =>
-  canOrgAcceptProjectAfterAudit(user, project)
-
-/** Аудит завершён с отказом — проект остаётся Pending, org не действует. */
-export const isAuditDeclinedForProject = (project: any) => {
-  const audit = getCompletedAudit(project)
-
-  return audit && Number(audit.result) === AUDIT_RESULT_DECLINED
-}
-
-/** Загрузка документов: staff или студент команды проекта. */
-export const canUploadProjectDocuments = (user: any, project: any) => {
-  if (!user || !project) return false
-
-  if (canWriteProject(user, project)) return true
-
-  if (user.role === ROLES.STUDENT && project.team_id && user.active_team_id) {
-    return Number(project.team_id) === Number(user.active_team_id)
-  }
-
-  return false
-}
-
-/** Удаление документов: staff или студент команды проекта. */
-export const canDeleteProjectDocuments = (user: any, project: any) => {
+/** Загрузка и удаление документов: staff или студент команды проекта. */
+export const canManageProjectDocuments = (user: any, project: any) => {
   if (!user || !project) return false
 
   if (canWriteProject(user, project)) return true
@@ -282,5 +266,3 @@ export const isOrgRole = (user: any) =>
   user &&
   [ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(user.role) &&
   user.organization_id
-
-export const isStudentRole = (user: any) => user?.role === ROLES.STUDENT

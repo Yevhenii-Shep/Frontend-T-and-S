@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api/axios'
 import { useAuthStore } from '@/stores/auth'
-import { canEditProject, canEditProjectBaseInfo } from '@/utils/projectPermissions'
+import { canEditProjectBaseInfo } from '@/utils/projectPermissions'
 import { apiData } from '@/utils/apiHelpers'
 
 const route = useRoute()

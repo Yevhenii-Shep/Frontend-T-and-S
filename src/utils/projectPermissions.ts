@@ -1,4 +1,5 @@
 import { ROLES } from '@/constants/roles'
+import { PROGRAM_TYPE } from '@/constants/project'
 
 const PROJECT_STATUS_INACTIVE = 3
 const PROJECT_STATUS_PENDING = 0
@@ -112,8 +113,15 @@ export const canUpdateStatusOrDeadline = (user: any, project: any) => {
 
 export const canAdminAssignRelations = (user: any) => user?.role === ROLES.ADMIN
 
-/** Команда проекта не меняется после создания. */
-export const canAssignTeamToProject = () => false
+/** Назначить команду: NTI staff, только program B. */
+export const canAssignTeamToProject = (user: any, project: any) => {
+  if (!user || !project) return false
+
+  return (
+    project.program_type === PROGRAM_TYPE.B &&
+    [ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(user.role)
+  )
+}
 
 export const canAssignOrganizationToProject = (user: any, project: any) => {
   if (!user || !project) return false

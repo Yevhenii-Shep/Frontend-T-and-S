@@ -17,6 +17,7 @@ import {
   canAssignNtiMentor,
   canAssignOrganizationMentor,
   canAssignOrganizationToProject,
+  canAssignTeamToProject,
   canDeleteProjectDocuments,
   canDeleteProject,
   canEditProjectBaseInfo,
@@ -50,6 +51,8 @@ const assignOrgId = ref<number | null>(null)
 const assignCategoryId = ref<number | null>(null)
 const assignNtiMentorId = ref<number | null>(null)
 const assignOrgMentorId = ref<number | null>(null)
+const assignTeamId = ref<number | null>(null)
+const teamCandidates = ref<any[]>([])
 
 // document
 const docFile = ref<File | null>(null)
@@ -107,6 +110,20 @@ const isAuditEnded = (endTime: string) => {
   */
 }
 
+const loadTeamCandidates = async () => {
+  if (!canAssignTeamToProject(auth.user, project.value)) {
+    teamCandidates.value = []
+    return
+  }
+
+  try {
+    const res = await api.get('/teams')
+    teamCandidates.value = apiList(res)
+  } catch {
+    teamCandidates.value = []
+  }
+}
+
 const loadAuditorCandidates = async () => {
   if (!canScheduleProjectAudit(auth.user, project.value)) {
     auditorCandidates.value = []
@@ -147,13 +164,14 @@ const fetchProject = async () => {
     assignCategoryId.value = project.value.category_id
     assignNtiMentorId.value = project.value.mentor_from_nti
     assignOrgMentorId.value = project.value.mentor_from_organization
+    assignTeamId.value = project.value.team_id
 
     const forms: Record<number, { user_id: number | null; role: number }> = {}
     for (const audit of project.value.audit_events ?? []) {
       forms[audit.id] = { user_id: null, role: 1 }
     }
     participantForm.value = forms
-    await loadAuditorCandidates()
+    await Promise.all([loadAuditorCandidates(), loadTeamCandidates()])
   } finally {
     loading.value = false
   }
@@ -200,6 +218,15 @@ const updateDeadline = async () => {
 
 const goToTeam = (id: number) => {
   router.push(`/teams/${id}`)
+}
+
+const assignTeam = async () => {
+  try {
+    await api.patch(`/projects/${project.value.id}/assign-team`, { team_id: assignTeamId.value })
+    await fetchProject()
+  } catch (e: any) {
+    alert(e?.response?.data?.message || 'Failed to assign team')
+  }
 }
 
 const assignOrganization = async () => {
@@ -607,6 +634,19 @@ onMounted(fetchProject)
           >
             Open team page
           </button>
+
+          <div v-if="canAssignTeamToProject(auth.user, project)" class="mt-3">
+            <p class="text-muted small mb-2">Assign or change the project team (program B only).</p>
+            <div class="d-flex gap-2">
+              <select v-model.number="assignTeamId" class="form-select">
+                <option :value="null">No team</option>
+                <option v-for="team in teamCandidates" :key="team.id" :value="team.id">
+                  {{ team.name }}
+                </option>
+              </select>
+              <button class="btn btn-outline-primary btn-sm" @click="assignTeam">Assign team</button>
+            </div>
+          </div>
         </div>
       </div>
 

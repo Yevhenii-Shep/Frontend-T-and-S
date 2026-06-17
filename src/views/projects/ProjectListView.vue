@@ -3,8 +3,8 @@ import { onMounted, ref } from 'vue'
 import api from '@/api/axios'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ROLES } from '@/constants/roles'
 import { canCreateProject } from '@/utils/projectPermissions'
+import { isOrgStaff, isStudent } from '@/utils/permissionRoleHelpers'
 import { PROJECT_STATUS_LABELS } from '@/constants/project'
 import { apiList } from '@/utils/apiHelpers'
 
@@ -68,11 +68,9 @@ const clearFilters = () => {
   fetchProjects()
 }
 
-const showMyTeamFilter = () => auth.user?.role === ROLES.STUDENT && !!auth.user.active_team_id
+const showMyTeamFilter = () => isStudent(auth.user) && !!auth.user?.active_team_id
 
-const showMyOrgFilter = () =>
-  [ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(auth.user?.role) &&
-  !!auth.user?.organization_id
+const showMyOrgFilter = () => isOrgStaff(auth.user)
 
 onMounted(fetchProjects)
 </script>

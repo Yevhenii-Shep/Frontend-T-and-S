@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import api from '@/api/axios'
-import { useAuthStore } from '@/stores/auth'
-import { ROLES } from '@/constants/roles'
+import { onMounted } from 'vue'
 import {
   AUDIT_RESULT_LABELS,
   MILESTONE_STATUS_LABELS,
@@ -11,507 +7,108 @@ import {
   PROJECT_STATUS_LABELS,
 } from '@/constants/project'
 import { ROLE_LABELS } from '@/constants/roles'
-import { apiData, apiList } from '@/utils/apiHelpers'
 import {
-  canAdminAssignRelations,
-  canAssignNtiMentor,
   canAssignOrganizationMentor,
   canAssignOrganizationToProject,
   canAssignTeamToProject,
   canDeleteProject,
   canEditProjectBaseInfo,
-  canManageProjectDocuments,
   canOrgAcceptProjectAfterAudit,
   canOrgViewProjectAssignmentSection,
-  canScheduleProjectAudit,
   canSetAuditResult,
-  getAuditMainAuditorId,
   canUpdateStatusOrDeadline,
-  canViewProject,
-  canWriteProject,
+  getAuditMainAuditorId,
 } from '@/utils/projectPermissions'
+import { isAdmin, isNtiStaff } from '@/utils/permissionRoleHelpers'
 import { canViewUser } from '@/utils/userPermissions'
+import { isAuditEnded } from '@/utils/auditHelpers'
+import { useProjectDetail } from '@/composables/useProjectDetail'
+import { useProjectAudit } from '@/composables/useProjectAudit'
+import { useProjectDocuments } from '@/composables/useProjectDocuments'
+import { useProjectMilestones } from '@/composables/useProjectMilestones'
+import { useProjectEvaluations } from '@/composables/useProjectEvaluations'
 
-const route = useRoute()
-const router = useRouter()
-const auth = useAuthStore()
+const {
+  auth,
+  router,
+  project,
+  loading,
+  isAllowed,
+  canWrite,
+  canManageDocuments,
+  canScheduleAudit,
+  newStatus,
+  newDeadline,
+  savingStatus,
+  savingDeadline,
+  assignOrgId,
+  assignCategoryId,
+  assignNtiMentorId,
+  assignOrgMentorId,
+  assignTeamId,
+  teamCandidates,
+  fetchProject: loadProject,
+  handleDelete,
+  updateStatus,
+  updateDeadline,
+  assignTeam,
+  assignOrganization,
+  acceptProjectAfterAudit,
+  declineProjectAfterAudit,
+  assignCategory,
+  assignNtiMentor,
+  assignOrgMentor,
+  goToTeam,
+  loadAuditorCandidates,
+} = useProjectDetail()
 
-const project = ref<any>(null)
-const loading = ref(false)
+let refresh: () => Promise<void>
 
-// status / deadline
-const newStatus = ref<number | null>(null)
-const newDeadline = ref('')
-const savingStatus = ref(false)
-const savingDeadline = ref(false)
+const {
+  auditForm,
+  savingAudit,
+  auditorCandidates,
+  syncParticipantForms,
+  loadCandidates,
+  createAudit,
+  setAuditResult,
+  deleteAudit,
+  addParticipant,
+  removeParticipant,
+  ensureParticipantForm,
+} = useProjectAudit(() => project.value, () => refresh(), loadAuditorCandidates)
 
-// admin assignments
-const assignOrgId = ref<number | null>(null)
-const assignCategoryId = ref<number | null>(null)
-const assignNtiMentorId = ref<number | null>(null)
-const assignOrgMentorId = ref<number | null>(null)
-const assignTeamId = ref<number | null>(null)
-const teamCandidates = ref<any[]>([])
+const {
+  docName,
+  uploadingDoc,
+  onDocFileChange,
+  uploadDocument,
+  downloadDocument,
+  deleteDocument,
+} = useProjectDocuments(() => project.value, () => refresh())
 
-// document
-const docFile = ref<File | null>(null)
-const docName = ref('')
-const uploadingDoc = ref(false)
+const {
+  milestoneForm,
+  savingMilestone,
+  createMilestone,
+  updateMilestoneStatus,
+  deleteMilestone,
+} = useProjectMilestones(() => project.value, () => refresh())
 
-// milestone
-const milestoneForm = ref({
-  name: '',
-  description: '',
-  status: 0,
-  deadline: '',
-})
-const savingMilestone = ref(false)
+const {
+  evaluationForm,
+  savingEvaluation,
+  createEvaluation,
+  deleteEvaluation,
+} = useProjectEvaluations(() => project.value, () => refresh())
 
-// evaluation
-const evaluationForm = ref({
-  score: 0,
-  comment: '',
-})
-const savingEvaluation = ref(false)
-
-// audit
-const auditForm = ref({
-  main_auditor: null as number | null,
-  start_time: '',
-  end_time: '',
-  result: null as number | null,
-})
-const savingAudit = ref(false)
-const participantForm = ref<Record<number, { user_id: number | null; role: number }>>({})
-const auditorCandidates = ref<any[]>([])
-
-const isAllowed = computed(() => canViewProject(auth.user, project.value))
-const canWrite = computed(() => canWriteProject(auth.user, project.value))
-const canManageDocuments = computed(() => canManageProjectDocuments(auth.user, project.value))
-const canScheduleAudit = computed(
-  () =>
-    canScheduleProjectAudit(auth.user, project.value) &&
-    project.value?.status === 0 &&
-    !(project.value?.audit_events?.length ?? 0),
-)
-const isAdmin = () => auth.user?.role === ROLES.ADMIN
-
-const isAuditEnded = (endTime: string) => {
-  return true
-  /*
-  if (!endTime) return false
-
-  const normalized = endTime.includes('T') ? endTime : endTime.replace(' ', 'T')
-  const end = new Date(normalized)
-
-  return !Number.isNaN(end.getTime()) && end <= new Date()
-  */
+refresh = async () => {
+  await loadProject()
+  syncParticipantForms()
+  await loadCandidates()
 }
 
-const loadAuditorCandidates = async () => {
-  if (!canScheduleProjectAudit(auth.user, project.value)) {
-    auditorCandidates.value = []
-    return
-  }
-
-  if (project.value?.status !== 0 || (project.value?.audit_events?.length ?? 0) > 0) {
-    auditorCandidates.value = []
-    return
-  }
-
-  try {
-    const res = await api.get('/users')
-    auditorCandidates.value = apiList(res).filter((user: any) => {
-      if ([ROLES.ADMIN, ROLES.NTI_EMPLOYEE].includes(user.role)) {
-        return true
-      }
-
-      return (
-        [ROLES.ORGANIZATION_ADMIN, ROLES.ORGANIZATION_EMPLOYEE].includes(user.role) &&
-        !!user.organization_id
-      )
-    })
-  } catch {
-    auditorCandidates.value = []
-  }
-}
-
-const fetchProject = async () => {
-  loading.value = true
-
-  try {
-    const res = await api.get(`/projects/${route.params.id}`)
-    project.value = apiData(res)
-    newStatus.value = project.value.status
-    newDeadline.value = project.value.deadline || ''
-    assignOrgId.value = project.value.organization_id
-    assignCategoryId.value = project.value.category_id
-    assignNtiMentorId.value = project.value.mentor_from_nti
-    assignOrgMentorId.value = project.value.mentor_from_organization
-    assignTeamId.value = project.value.team_id
-
-    const forms: Record<number, { user_id: number | null; role: number }> = {}
-    for (const audit of project.value.audit_events ?? []) {
-      forms[audit.id] = { user_id: null, role: 1 }
-    }
-    participantForm.value = forms
-    await loadAuditorCandidates()
-    await loadTeamCandidates()
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleDelete = async () => {
-  if (!confirm('Deactivate this project?')) return
-
-  try {
-    await api.delete(`/projects/${project.value.id}`)
-    router.push('/projects')
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to delete project')
-  }
-}
-
-const updateStatus = async () => {
-  savingStatus.value = true
-
-  try {
-    await api.patch(`/projects/${project.value.id}/status`, { status: newStatus.value })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to update status')
-  } finally {
-    savingStatus.value = false
-  }
-}
-
-const updateDeadline = async () => {
-  savingDeadline.value = true
-
-  try {
-    await api.patch(`/projects/${project.value.id}/deadline`, {
-      deadline: newDeadline.value || null,
-    })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to update deadline')
-  } finally {
-    savingDeadline.value = false
-  }
-}
-
-const loadTeamCandidates = async () => {
-  if (!canAssignTeamToProject(auth.user, project.value)) {
-    teamCandidates.value = []
-    return
-  }
-
-  try {
-    const res = await api.get('/teams')
-    teamCandidates.value = apiList(res)
-  } catch {
-    teamCandidates.value = []
-  }
-}
-
-const assignTeam = async () => {
-  try {
-    await api.patch(`/projects/${project.value.id}/assign-team`, {
-      team_id: assignTeamId.value,
-    })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to assign team')
-  }
-}
-
-const goToTeam = (id: number) => {
-  router.push(`/teams/${id}`)
-}
-
-const assignOrganization = async () => {
-  try {
-    await api.patch(`/projects/${project.value.id}/assign-organization`, {
-      organization_id: assignOrgId.value,
-    })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to assign organization')
-  }
-}
-
-const acceptProjectAfterAudit = async () => {
-  if (!confirm('Accept this project for your organization? The project will become Active.')) return
-
-  try {
-    await api.patch(`/projects/${project.value.id}/accept-after-audit`)
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to accept project after audit')
-  }
-}
-
-const declineProjectAfterAudit = async () => {
-  if (!confirm('Decline this project? It will remain Pending.')) return
-
-  try {
-    await api.patch(`/projects/${project.value.id}/decline-after-audit`)
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to decline project after audit')
-  }
-}
-
-const assignCategory = async () => {
-  try {
-    await api.patch(`/projects/${project.value.id}/assign-category`, {
-      category_id: assignCategoryId.value,
-    })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to assign category')
-  }
-}
-
-const assignNtiMentor = async () => {
-  try {
-    await api.patch(`/projects/${project.value.id}/assign-nti-mentor`, {
-      mentor_from_nti: assignNtiMentorId.value,
-    })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to assign NTI mentor')
-  }
-}
-
-const assignOrgMentor = async () => {
-  try {
-    await api.patch(`/projects/${project.value.id}/assign-organization-mentor`, {
-      mentor_from_organization: assignOrgMentorId.value,
-    })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to assign organization mentor')
-  }
-}
-
-const onDocFileChange = (event: Event) => {
-  const input = event.target as HTMLInputElement
-  docFile.value = input.files?.[0] || null
-}
-
-const uploadDocument = async () => {
-  if (!docFile.value) return
-
-  uploadingDoc.value = true
-
-  try {
-    const formData = new FormData()
-    formData.append('file', docFile.value)
-    formData.append('project_id', String(project.value.id))
-    if (docName.value) {
-      formData.append('name', docName.value)
-    }
-
-    await api.post('/documents', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-
-    docFile.value = null
-    docName.value = ''
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to upload document')
-  } finally {
-    uploadingDoc.value = false
-  }
-}
-
-const downloadDocument = async (docId: number, name: string) => {
-  try {
-    const res = await api.get(`/documents/${docId}/download`, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = name
-    link.click()
-    window.URL.revokeObjectURL(url)
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to download document')
-  }
-}
-
-const deleteDocument = async (docId: number) => {
-  if (!confirm('Delete this document?')) return
-
-  try {
-    await api.delete(`/documents/${docId}`)
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to delete document')
-  }
-}
-
-const createMilestone = async () => {
-  savingMilestone.value = true
-
-  try {
-    await api.post('/milestones', {
-      project_id: project.value.id,
-      name: milestoneForm.value.name,
-      description: milestoneForm.value.description || null,
-      status: milestoneForm.value.status,
-      deadline: milestoneForm.value.deadline || null,
-    })
-
-    milestoneForm.value = { name: '', description: '', status: 0, deadline: '' }
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to create milestone')
-  } finally {
-    savingMilestone.value = false
-  }
-}
-
-const updateMilestoneStatus = async (milestoneId: number, status: number) => {
-  try {
-    await api.patch(`/milestones/${milestoneId}/status`, { status })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to update milestone status')
-  }
-}
-
-const deleteMilestone = async (milestoneId: number) => {
-  if (!confirm('Delete this milestone?')) return
-
-  try {
-    await api.delete(`/milestones/${milestoneId}`)
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to delete milestone')
-  }
-}
-
-const createEvaluation = async () => {
-  savingEvaluation.value = true
-
-  try {
-    await api.post('/evaluations', {
-      project_id: project.value.id,
-      score: evaluationForm.value.score,
-      comment: evaluationForm.value.comment || null,
-    })
-
-    evaluationForm.value = { score: 0, comment: '' }
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to create evaluation')
-  } finally {
-    savingEvaluation.value = false
-  }
-}
-
-const deleteEvaluation = async (evaluationId: number) => {
-  if (!confirm('Delete this evaluation?')) return
-
-  try {
-    await api.delete(`/evaluations/${evaluationId}`)
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to delete evaluation')
-  }
-}
-
-const createAudit = async () => {
-  savingAudit.value = true
-
-  try {
-    await api.post('/audit-events', {
-      project_id: project.value.id,
-      main_auditor: auditForm.value.main_auditor,
-      start_time: auditForm.value.start_time,
-      end_time: auditForm.value.end_time,
-    })
-
-    auditForm.value = { main_auditor: null, start_time: '', end_time: '', result: null }
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to create audit')
-  } finally {
-    savingAudit.value = false
-  }
-}
-
-const setAuditResult = async (auditId: number, result: number) => {
-  const isAccepted = result === 1
-  const label = isAccepted ? 'accept' : 'decline'
-
-  if (
-    !confirm(
-      `Set audit result to "${label}"? The project status will not change until the organization decides.`,
-    )
-  ) {
-    return
-  }
-
-  try {
-    await api.patch(`/audit-events/${auditId}/result`, { result })
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to set audit result')
-  }
-}
-
-const deleteAudit = async (auditId: number) => {
-  if (!confirm('Delete this audit event?')) return
-
-  try {
-    await api.delete(`/audit-events/${auditId}`)
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to delete audit')
-  }
-}
-
-const addParticipant = async (auditId: number) => {
-  const form = participantForm.value[auditId]
-  if (!form?.user_id) return
-
-  try {
-    await api.post(`/audit-events/${auditId}/participants`, {
-      user_id: form.user_id,
-      role: form.role,
-    })
-
-    participantForm.value[auditId] = { user_id: null, role: 1 }
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to add participant')
-  }
-}
-
-const removeParticipant = async (auditId: number, userId: number) => {
-  if (!confirm('Remove participant?')) return
-
-  try {
-    await api.delete(`/audit-events/${auditId}/participants/${userId}`)
-    await fetchProject()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || 'Failed to remove participant')
-  }
-}
-
-const ensureParticipantForm = (auditId: number) => {
-  if (!participantForm.value[auditId]) {
-    participantForm.value[auditId] = { user_id: null, role: 1 }
-  }
-
-  return participantForm.value[auditId]
-}
-
-onMounted(fetchProject)
+onMounted(refresh)
 </script>
 
 <template>
@@ -521,13 +118,10 @@ onMounted(fetchProject)
     <div v-if="loading" class="text-center py-5">Loading...</div>
 
     <div v-else-if="project && isAllowed">
-      <!-- header -->
       <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
           <h2 class="mb-1">{{ project.name }}(ID: {{ project.id }})</h2>
-          <p class="text-muted mb-0">
-            {{ project.slug || 'No description' }}
-          </p>
+          <p class="text-muted mb-0">{{ project.slug || 'No description' }}</p>
         </div>
 
         <div class="d-flex gap-2">
@@ -545,7 +139,6 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- info -->
       <div class="card mb-3">
         <div class="card-body">
           <p><strong>Category:</strong> {{ project.category_name || '-' }}</p>
@@ -563,18 +156,13 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- Description -->
       <div class="card mb-4">
         <div class="card-body">
           <h5>Description</h5>
-
-          <p class="mb-0">
-            {{ project.description || 'No description provided' }}
-          </p>
+          <p class="mb-0">{{ project.description || 'No description provided' }}</p>
         </div>
       </div>
 
-      <!-- status / deadline -->
       <div v-if="canUpdateStatusOrDeadline(auth.user, project)" class="card mb-3">
         <div class="card-body">
           <h5>Status & Deadline</h5>
@@ -587,7 +175,6 @@ onMounted(fetchProject)
                 <option :value="2">Done</option>
               </select>
             </div>
-
             <div class="col-auto">
               <button class="btn btn-primary btn-sm" :disabled="savingStatus" @click="updateStatus">
                 Update status
@@ -597,7 +184,6 @@ onMounted(fetchProject)
 
           <div class="d-flex gap-2">
             <input v-model="newDeadline" type="date" class="form-control" />
-
             <button
               class="btn btn-primary btn-sm"
               :disabled="savingDeadline"
@@ -609,13 +195,10 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- team -->
       <div class="card mb-3">
         <div class="card-body">
           <h5>Team</h5>
-          <p v-if="project.team_name" class="mb-2">
-            {{ project.team_name }}
-          </p>
+          <p v-if="project.team_name" class="mb-2">{{ project.team_name }}</p>
 
           <div v-if="project.team?.users?.length" class="mb-3">
             <ul class="list-group">
@@ -651,12 +234,11 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- organization assignment -->
       <div
         v-if="
           canOrgAcceptProjectAfterAudit(auth.user, project) ||
           canOrgViewProjectAssignmentSection(auth.user, project) ||
-          (canAdminAssignRelations(auth.user) && canAssignOrganizationToProject(auth.user, project))
+          (isAdmin(auth.user) && canAssignOrganizationToProject(auth.user, project))
         "
         class="card mb-3"
       >
@@ -689,7 +271,7 @@ onMounted(fetchProject)
 
           <template
             v-else-if="
-              canAdminAssignRelations(auth.user) &&
+              isAdmin(auth.user) &&
               canAssignOrganizationToProject(auth.user, project)
             "
           >
@@ -708,8 +290,7 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- admin category -->
-      <div v-if="canAdminAssignRelations(auth.user)" class="card mb-3">
+      <div v-if="isAdmin(auth.user)" class="card mb-3">
         <div class="card-body">
           <h5>Category (Admin)</h5>
           <div class="d-flex gap-2">
@@ -726,16 +307,15 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- mentors -->
       <div
-        v-if="canAssignNtiMentor(auth.user) || canAssignOrganizationMentor(auth.user, project)"
+        v-if="isNtiStaff(auth.user) || canAssignOrganizationMentor(auth.user, project)"
         class="card mb-3"
       >
         <div class="card-body">
           <h5>Mentors</h5>
 
           <p class="text-muted mb-2">Mentor from NTI (User ID):</p>
-          <div v-if="canAssignNtiMentor(auth.user)" class="d-flex gap-2 mb-2">
+          <div v-if="isNtiStaff(auth.user)" class="d-flex gap-2 mb-2">
             <input
               v-model.number="assignNtiMentorId"
               type="number"
@@ -762,7 +342,6 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- documents -->
       <div class="card mb-3">
         <div class="card-body">
           <h5>Documents</h5>
@@ -775,7 +354,6 @@ onMounted(fetchProject)
                 class="list-group-item d-flex justify-content-between align-items-center"
               >
                 <span>{{ doc.name }}</span>
-
                 <div class="d-flex gap-2">
                   <button
                     class="btn btn-sm btn-outline-primary"
@@ -783,7 +361,6 @@ onMounted(fetchProject)
                   >
                     Download
                   </button>
-
                   <button
                     v-if="canManageDocuments"
                     class="btn btn-sm btn-danger"
@@ -801,14 +378,17 @@ onMounted(fetchProject)
           <div v-if="canManageDocuments" class="d-flex gap-2">
             <input v-model="docName" class="form-control" placeholder="Name (optional)" />
             <input type="file" class="form-control" @change="onDocFileChange" />
-            <button class="btn btn-primary btn-sm" :disabled="uploadingDoc" @click="uploadDocument">
+            <button
+              class="btn btn-primary btn-sm"
+              :disabled="uploadingDoc"
+              @click="uploadDocument"
+            >
               Upload
             </button>
           </div>
         </div>
       </div>
 
-      <!-- milestones -->
       <div class="card mb-3">
         <div class="card-body">
           <h5>Milestones</h5>
@@ -841,8 +421,10 @@ onMounted(fetchProject)
                         {{ label }}
                       </option>
                     </select>
-
-                    <button class="btn btn-sm btn-danger" @click="deleteMilestone(m.id)">
+                    <button
+                      class="btn btn-sm btn-danger"
+                      @click="deleteMilestone(m.id)"
+                    >
                       Delete
                     </button>
                   </div>
@@ -859,10 +441,18 @@ onMounted(fetchProject)
 
           <div v-if="canWrite" class="row g-2">
             <div class="col-md-4">
-              <input v-model="milestoneForm.name" class="form-control" placeholder="Name" />
+              <input
+                v-model="milestoneForm.name"
+                class="form-control"
+                placeholder="Name"
+              />
             </div>
             <div class="col-md-4">
-              <input v-model="milestoneForm.deadline" type="date" class="form-control" />
+              <input
+                v-model="milestoneForm.deadline"
+                type="date"
+                class="form-control"
+              />
             </div>
             <div class="col-md-4">
               <select v-model.number="milestoneForm.status" class="form-select">
@@ -896,7 +486,6 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- evaluations -->
       <div class="card mb-3">
         <div class="card-body">
           <h5>Evaluations</h5>
@@ -913,7 +502,6 @@ onMounted(fetchProject)
                   — {{ e.evaluator?.name || 'Unknown' }}
                   <span v-if="e.comment" class="text-muted">({{ e.comment }})</span>
                 </span>
-
                 <button
                   v-if="canWrite"
                   class="btn btn-sm btn-danger"
@@ -936,7 +524,11 @@ onMounted(fetchProject)
               class="form-control"
               placeholder="Score"
             />
-            <input v-model="evaluationForm.comment" class="form-control" placeholder="Comment" />
+            <input
+              v-model="evaluationForm.comment"
+              class="form-control"
+              placeholder="Comment"
+            />
             <button
               class="btn btn-primary btn-sm"
               :disabled="savingEvaluation"
@@ -948,13 +540,12 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- audit events -->
       <div class="card mb-3">
         <div class="card-body">
           <h5>Audit Events</h5>
 
           <div v-if="project.audit_events?.length">
-            <div v-for="audit in project.audit_events" :key="audit.id" class="card mb-3">
+            <div v-for="item in project.audit_events" :key="item.id" class="card mb-3">
               <div class="card-body">
                 <div class="d-flex justify-content-between">
                   <div>
@@ -962,27 +553,27 @@ onMounted(fetchProject)
                       <strong>Auditor:</strong>
                       <RouterLink
                         v-if="
-                          getAuditMainAuditorId(audit) &&
-                          canViewUser(auth.user, { id: getAuditMainAuditorId(audit) })
+                          getAuditMainAuditorId(item) &&
+                          canViewUser(auth.user, { id: getAuditMainAuditorId(item) })
                         "
-                        :to="`/users/${getAuditMainAuditorId(audit)}`"
+                        :to="`/users/${getAuditMainAuditorId(item)}`"
                       >
-                        {{ audit.main_auditor_name || audit.main_auditor?.name || '-' }}
+                        {{ item.main_auditor_name || item.main_auditor?.name || '-' }}
                       </RouterLink>
-                      <span v-else>{{ audit.main_auditor_name || '-' }}</span>
+                      <span v-else>{{ item.main_auditor_name || '-' }}</span>
                     </div>
-                    <div><strong>Start:</strong> {{ audit.start_time }}</div>
-                    <div><strong>End:</strong> {{ audit.end_time }}</div>
+                    <div><strong>Start:</strong> {{ item.start_time }}</div>
+                    <div><strong>End:</strong> {{ item.end_time }}</div>
                     <div>
                       <strong>Result:</strong>
-                      {{ audit.result ? AUDIT_RESULT_LABELS[audit.result] : 'Pending' }}
+                      {{ item.result ? AUDIT_RESULT_LABELS[item.result] : 'Pending' }}
                     </div>
                   </div>
 
                   <button
-                    v-if="isAdmin()"
+                    v-if="isAdmin(auth.user)"
                     class="btn btn-sm btn-danger"
-                    @click="deleteAudit(audit.id)"
+                    @click="deleteAudit(item.id)"
                   >
                     Delete
                   </button>
@@ -990,9 +581,9 @@ onMounted(fetchProject)
 
                 <div
                   v-if="
-                    audit.result == null &&
-                    isAuditEnded(audit.end_time) &&
-                    canSetAuditResult(auth.user, audit)
+                    item.result == null &&
+                    isAuditEnded(item.end_time) &&
+                    canSetAuditResult(auth.user, item)
                   "
                   class="mt-3"
                 >
@@ -1001,12 +592,12 @@ onMounted(fetchProject)
                     whether to accept the project.
                   </p>
                   <div class="d-flex gap-2">
-                    <button class="btn btn-success btn-sm" @click="setAuditResult(audit.id, 1)">
+                    <button class="btn btn-success btn-sm" @click="setAuditResult(item.id, 1)">
                       Accept audit
                     </button>
                     <button
                       class="btn btn-outline-danger btn-sm"
-                      @click="setAuditResult(audit.id, 2)"
+                      @click="setAuditResult(item.id, 2)"
                     >
                       Decline audit
                     </button>
@@ -1015,27 +606,26 @@ onMounted(fetchProject)
 
                 <div
                   v-else-if="
-                    audit.result && isAuditEnded(audit.end_time) && Number(audit.result) === 2
+                    item.result && isAuditEnded(item.end_time) && Number(item.result) === 2
                   "
                   class="alert alert-warning mt-3 mb-0"
                 >
                   Audit was declined. The project remains Pending.
                 </div>
 
-                <div v-if="audit.participants?.length" class="mt-3">
+                <div v-if="item.participants?.length" class="mt-3">
                   <h6>Participants</h6>
                   <ul class="list-group">
                     <li
-                      v-for="p in audit.participants"
+                      v-for="p in item.participants"
                       :key="p.id"
                       class="list-group-item d-flex justify-content-between"
                     >
                       {{ p.user?.name || p.user_id }}
-
                       <button
                         v-if="canWrite"
                         class="btn btn-sm btn-outline-danger"
-                        @click="removeParticipant(audit.id, p.user_id)"
+                        @click="removeParticipant(item.id, p.user_id)"
                       >
                         Remove
                       </button>
@@ -1045,16 +635,22 @@ onMounted(fetchProject)
 
                 <div v-if="canWrite" class="d-flex gap-2 mt-3">
                   <input
-                    v-model.number="ensureParticipantForm(audit.id).user_id"
+                    v-model.number="ensureParticipantForm(item.id).user_id"
                     type="number"
                     class="form-control"
                     placeholder="User ID"
                   />
-                  <select v-model.number="ensureParticipantForm(audit.id).role" class="form-select">
+                  <select
+                    v-model.number="ensureParticipantForm(item.id).role"
+                    class="form-select"
+                  >
                     <option :value="1">Auditor</option>
                     <option :value="2">Contributor</option>
                   </select>
-                  <button class="btn btn-outline-primary btn-sm" @click="addParticipant(audit.id)">
+                  <button
+                    class="btn btn-outline-primary btn-sm"
+                    @click="addParticipant(item.id)"
+                  >
                     Add participant
                   </button>
                 </div>
@@ -1077,10 +673,18 @@ onMounted(fetchProject)
                 </select>
               </div>
               <div class="col-md-3">
-                <input v-model="auditForm.start_time" type="datetime-local" class="form-control" />
+                <input
+                  v-model="auditForm.start_time"
+                  type="datetime-local"
+                  class="form-control"
+                />
               </div>
               <div class="col-md-3">
-                <input v-model="auditForm.end_time" type="datetime-local" class="form-control" />
+                <input
+                  v-model="auditForm.end_time"
+                  type="datetime-local"
+                  class="form-control"
+                />
               </div>
               <div class="col-auto">
                 <button
@@ -1103,14 +707,12 @@ onMounted(fetchProject)
         </div>
       </div>
 
-      <!-- danger zone -->
       <div v-if="canDeleteProject(auth.user, project)" class="card border-danger">
         <div class="card-body d-flex justify-content-between align-items-center">
           <div>
             <h5 class="text-danger mb-1">Danger Zone</h5>
             <small class="text-muted">Deactivating a project sets status to inactive</small>
           </div>
-
           <button class="btn btn-danger" @click="handleDelete">Deactivate Project</button>
         </div>
       </div>

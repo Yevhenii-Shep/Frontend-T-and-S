@@ -3,8 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api/axios'
 import { useAuthStore } from '@/stores/auth'
-import { ROLES } from '@/constants/roles'
 import { creatableProgramTypes } from '@/utils/projectPermissions'
+import { isAdmin, isStudent } from '@/utils/permissionRoleHelpers'
 import { PROGRAM_TYPE_LABELS } from '@/constants/project'
 import { apiData, apiList } from '@/utils/apiHelpers'
 
@@ -29,9 +29,6 @@ const form = ref({
 })
 
 const programOptions = computed(() => creatableProgramTypes(auth.user))
-
-const isStudent = () => auth.user?.role === ROLES.STUDENT
-const isAdmin = () => auth.user?.role === ROLES.ADMIN
 
 const fetchCategories = async () => {
   const response = await api.get('/categories')
@@ -68,11 +65,11 @@ const createProject = async () => {
       deadline: form.value.deadline || null,
     }
 
-    if (!isStudent() && form.value.team_id) {
+    if (!isStudent(auth.user) && form.value.team_id) {
       payload.team_id = form.value.team_id
     }
 
-    if (isAdmin() && form.value.organization_id) {
+    if (isAdmin(auth.user) && form.value.organization_id) {
       payload.organization_id = form.value.organization_id
     }
 
@@ -157,7 +154,7 @@ onMounted(async () => {
             </select>
           </div>
 
-          <div v-if="isStudent()" class="alert alert-info py-2">
+          <div v-if="isStudent(auth.user)" class="alert alert-info py-2">
             The project will be linked to your active team automatically.
           </div>
 
@@ -166,7 +163,7 @@ onMounted(async () => {
             <input v-model.number="form.team_id" type="number" class="form-control" />
           </div>
 
-          <div v-if="isAdmin()" class="mb-3">
+          <div v-if="isAdmin(auth.user)" class="mb-3">
             <label class="form-label">Organization ID</label>
             <input v-model.number="form.organization_id" type="number" class="form-control" />
           </div>

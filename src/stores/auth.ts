@@ -11,6 +11,7 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => !!state.token,
+    isEmailVerified: (state) => !!state.user?.email_verified_at,
   },
 
   actions: {
@@ -46,10 +47,13 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await api.get('/me')
         this.user = apiData(response)
-      } catch {
-        this.token = null
-        this.user = null
-        localStorage.removeItem('token')
+      } catch (e: any) {
+        // НЕ удаляй токен если просто email не verified
+        if (e?.response?.status === 401) {
+          this.token = null
+          this.user = null
+          localStorage.removeItem('token')
+        }
       } finally {
         this.isReady = true
       }
@@ -75,6 +79,10 @@ export const useAuthStore = defineStore('auth', {
         return
       }
 
+      await this.fetchUser()
+    },
+
+    async refreshUser() {
       await this.fetchUser()
     },
   },

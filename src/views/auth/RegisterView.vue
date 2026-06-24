@@ -22,7 +22,7 @@ const submit = async () => {
 
   try {
     await auth.register(form.value)
-    router.push('/') // после регистрации на главную
+    router.push('/verify-email') // после регистрации на просьбу подтвердить
   } catch (e: any) {
     alert(e?.response?.data?.message || 'Registration failed')
   } finally {

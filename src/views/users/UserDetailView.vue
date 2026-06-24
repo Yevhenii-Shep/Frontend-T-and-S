@@ -161,6 +161,17 @@ const uploadAvatar = async () => {
   }
 }
 
+const sendMailVerification = async () => {
+  loading.value = true
+  try {
+    await api.post('/email/resend')
+    router.push('/verify-email')
+  } catch (e) {
+    alert('Failed to send email')
+  } finally {
+    loading.value = false
+  }
+}
 onMounted(async () => {
   await fetchUser()
 
@@ -201,6 +212,17 @@ onMounted(async () => {
             @click="router.push(`/users/${user.id}/edit`)"
           >
             Edit
+          </button>
+        </div>
+      </div>
+
+      <div v-if="auth.isAuthenticated && !auth.isEmailVerified" class="card mb-3">
+        <div class="card-body text-center">
+          <h2 class="mb-2">
+            Email is not verified, to access all features, please verify your email.
+          </h2>
+          <button class="btn btn-warning btn-lg" :disabled="loading" @click="sendMailVerification">
+            {{ loading ? 'Sending...' : 'Verify Email' }}
           </button>
         </div>
       </div>

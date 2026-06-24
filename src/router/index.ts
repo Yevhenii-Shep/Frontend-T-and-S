@@ -8,6 +8,7 @@ import OrganizationListView from '@/views/organizations/OrganizationListView.vue
 import ProjectListView from '@/views/projects/ProjectListView.vue'
 import RegisterView from '@/views/auth/RegisterView.vue'
 import { useAuthStore } from '@/stores/auth'
+import VerifyEmailView from '@/views/auth/VerifyEmailView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -26,6 +27,11 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
+    },
+    {
+      path: '/verify-email',
+      name: 'verify-email',
+      component: VerifyEmailView,
     },
 
     // Teams
@@ -183,8 +189,12 @@ router.beforeEach(async (to) => {
     await auth.initAuth()
   }
 
-  if (!auth.isAuthenticated && !publicRoutes.includes(to.name as string)) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+  if (!auth.isAuthenticated) {
+    const publicPages = ['/login', '/register', '/verify-email']
+
+    if (!publicPages.includes(to.path)) {
+      return '/login'
+    }
   }
 })
 

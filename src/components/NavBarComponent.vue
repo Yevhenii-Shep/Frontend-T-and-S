@@ -2,13 +2,28 @@
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { canViewUsers } from '@/utils/userPermissions'
+import { ref } from 'vue'
+import api from '@/api/axios'
 
 const auth = useAuthStore()
 const router = useRouter()
+const loading = ref(false)
 
 const logout = async () => {
   await auth.logout()
   router.push('/login')
+}
+
+const sendMailVerification = async () => {
+  loading.value = true
+  try {
+    await api.post('/email/resend')
+    router.push('/verify-email')
+  } catch (e) {
+    alert('Failed to send email')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -27,7 +42,7 @@ const logout = async () => {
       </button>
 
       <div class="collapse navbar-collapse" id="navbarNav">
-        <ul v-if="auth.isAuthenticated" class="navbar-nav me-auto">
+        <ul v-if="auth.isAuthenticated && auth.isEmailVerified" class="navbar-nav me-auto">
           <li class="nav-item">
             <RouterLink class="nav-link" to="/teams"> Teams </RouterLink>
           </li>
@@ -61,6 +76,16 @@ const logout = async () => {
               </RouterLink>
             </li>
 
+            <li v-if="auth.isAuthenticated && !auth.isEmailVerified" class="nav-item me-2">
+              <button
+                class="btn btn-warning btn-sm"
+                :disabled="loading"
+                @click="sendMailVerification"
+              >
+                {{ loading ? 'Sending...' : 'Please, Verify Your Email' }}
+              </button>
+            </li>
+
             <li class="nav-item">
               <button
                 class="btn btn-outline-light btn-sm me-1"
@@ -69,6 +94,7 @@ const logout = async () => {
                 Your Profile
               </button>
             </li>
+
             <li class="nav-item">
               <button class="btn btn-outline-light btn-sm" @click="logout">Logout</button>
             </li>

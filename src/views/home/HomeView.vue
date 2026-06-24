@@ -48,205 +48,238 @@ const joinTeam = async () => {
     loading.value = false
   }
 }
+
+const sendMailVerification = async () => {
+  loading.value = true
+  try {
+    await api.post('/email/resend')
+    router.push('/verify-email')
+  } catch (e) {
+    alert('Failed to send email')
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
-  <div class="container py-4">
-    <div v-if="auth.isAuthenticated && auth.user" class="mb-4">
-      <h1 class="mb-1">Welcome, {{ auth.user.name }}</h1>
-      <p class="text-muted mb-0">NTI project management portal</p>
-    </div>
-
-    <h1 v-else class="mb-4">Home</h1>
-
-    <div v-if="!auth.isAuthenticated" class="card mb-4 border-primary">
-      <div class="card-body text-center py-5">
-        <h3 class="mb-2">You are not authenticated yet!</h3>
-
-        <p class="text-muted mb-2">Do you already have an account? Great, then log in.</p>
-        <button class="btn btn-outline-secondary btn-lg" @click="router.push('/login')">
-          Login in your account
-        </button>
-
-        <p class="text-muted mb-2 mt-4">
-          Are you a student and still haven't registered? Then create an account now.
-        </p>
-        <button class="btn btn-lg btn-success" @click="router.push('/register')">
-          Register as Student
-        </button>
+  <div v-if="auth.isEmailVerified">
+    <div class="container py-4">
+      <div v-if="auth.isAuthenticated && auth.user" class="mb-4">
+        <h1 class="mb-1">Welcome, {{ auth.user.name }}</h1>
+        <p class="text-muted mb-0">NTI project management portal</p>
       </div>
-    </div>
 
-    <div v-if="auth.isAuthenticated && auth.user?.has_active_team" class="mt-4 mb-2">
-      <MyTeamCardComponent />
-    </div>
+      <h1 v-else class="mb-4">Home</h1>
 
-    <div v-if="auth.isAuthenticated && auth.user?.organization_id" class="mt-4 mb-2">
-      <MyOrganizationCardComponent />
-    </div>
+      <div v-if="!auth.isAuthenticated" class="card mb-4 border-primary">
+        <div class="card-body text-center py-5">
+          <h3 class="mb-2">You are not authenticated yet!</h3>
 
-    <div v-if="canCreateProject(auth.user)" class="col-md-4 col-lg-12 mb-2">
-      <div class="card h-100">
-        <div class="card-body">
-          <h5>New Project</h5>
-          <p class="text-muted">Start a new project</p>
-          <button class="btn btn-primary btn-sm" @click="router.push('/projects/create')">
-            Create
+          <p class="text-muted mb-2">Do you already have an account? Great, then log in.</p>
+          <button class="btn btn-outline-secondary btn-lg" @click="router.push('/login')">
+            Login in your account
+          </button>
+
+          <p class="text-muted mb-2 mt-4">
+            Are you a student and still haven't registered? Then create an account now.
+          </p>
+          <button class="btn btn-lg btn-success" @click="router.push('/register')">
+            Register as Student
           </button>
         </div>
       </div>
-    </div>
 
-    <div v-if="auth.isAuthenticated" class="row g-3">
-      <div v-if="canCreateTeam(auth.user)" class="col-md-6">
-        <div class="card mb-2">
+      <div v-if="auth.isAuthenticated && auth.user?.has_active_team" class="mt-4 mb-2">
+        <MyTeamCardComponent />
+      </div>
+
+      <div v-if="auth.isAuthenticated && auth.user?.organization_id" class="mt-4 mb-2">
+        <MyOrganizationCardComponent />
+      </div>
+
+      <div v-if="canCreateProject(auth.user)" class="col-md-4 col-lg-12 mb-2">
+        <div class="card h-100">
           <div class="card-body">
-            <h5>Create Team</h5>
-            <p class="text-muted">Start a new team</p>
-
-            <button class="btn btn-primary" @click="router.push('/teams/create')">Create</button>
+            <h5>New Project</h5>
+            <p class="text-muted">Start a new project</p>
+            <button class="btn btn-primary btn-sm" @click="router.push('/projects/create')">
+              Create
+            </button>
           </div>
         </div>
       </div>
 
-      <div v-if="canJoinTeam(auth.user)" class="col-md-6 mb-2">
-        <div class="card">
-          <div class="card-body">
-            <h5>Join Team</h5>
-            <p class="text-muted">To join the team, you must know the invitation code</p>
+      <div v-if="auth.isAuthenticated" class="row g-3">
+        <div v-if="canCreateTeam(auth.user)" class="col-md-6">
+          <div class="card mb-2">
+            <div class="card-body">
+              <h5>Create Team</h5>
+              <p class="text-muted">Start a new team</p>
 
-            <div class="d-flex gap-2">
-              <input v-model="inviteCode" class="form-control" placeholder="Invite code" />
-
-              <button class="btn btn-success" :disabled="loading" @click="joinTeam">
-                {{ loading ? 'Joining...' : 'Join' }}
-              </button>
+              <button class="btn btn-primary" @click="router.push('/teams/create')">Create</button>
             </div>
-
-            <p v-if="error" class="text-danger mt-2">
-              {{ error }}
-            </p>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div v-if="auth.isAuthenticated" class="row g-3 mb-4">
-      <div class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>Projects</h5>
-            <p class="text-muted">Browse and manage projects</p>
-            <button class="btn btn-outline-primary btn-sm" @click="router.push('/projects')">
-              Open
-            </button>
-          </div>
-        </div>
-      </div>
+        <div v-if="canJoinTeam(auth.user)" class="col-md-6 mb-2">
+          <div class="card">
+            <div class="card-body">
+              <h5>Join Team</h5>
+              <p class="text-muted">To join the team, you must know the invitation code</p>
 
-      <div class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>Teams</h5>
-            <p class="text-muted">View all teams</p>
-            <button class="btn btn-outline-primary btn-sm" @click="router.push('/teams')">
-              Open
-            </button>
+              <div class="d-flex gap-2">
+                <input v-model="inviteCode" class="form-control" placeholder="Invite code" />
+
+                <button class="btn btn-success" :disabled="loading" @click="joinTeam">
+                  {{ loading ? 'Joining...' : 'Join' }}
+                </button>
+              </div>
+
+              <p v-if="error" class="text-danger mt-2">
+                {{ error }}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      <div v-if="canViewUsers(auth.user)" class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>Users</h5>
-            <p class="text-muted">Manage system users</p>
-            <div class="d-flex gap-2">
-              <button class="btn btn-outline-primary btn-sm" @click="router.push('/users')">
+      <div v-if="auth.isAuthenticated" class="row g-3 mb-4">
+        <div class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>Projects</h5>
+              <p class="text-muted">Browse and manage projects</p>
+              <button class="btn btn-outline-primary btn-sm" @click="router.push('/projects')">
                 Open
               </button>
-              <button
-                v-if="canCreateUser(auth.user)"
-                class="btn btn-primary btn-sm"
-                @click="router.push('/users/create')"
-              >
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>Teams</h5>
+              <p class="text-muted">View all teams</p>
+              <button class="btn btn-outline-primary btn-sm" @click="router.push('/teams')">
+                Open
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="canViewUsers(auth.user)" class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>Users</h5>
+              <p class="text-muted">Manage system users</p>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary btn-sm" @click="router.push('/users')">
+                  Open
+                </button>
+                <button
+                  v-if="canCreateUser(auth.user)"
+                  class="btn btn-primary btn-sm"
+                  @click="router.push('/users/create')"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="isStaff()" class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>Organizations</h5>
+              <p class="text-muted">Partner organizations</p>
+              <button class="btn btn-outline-primary btn-sm" @click="router.push('/organizations')">
+                Open
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>Subjects</h5>
+              <p class="text-muted">Academic subjects</p>
+              <button class="btn btn-outline-primary btn-sm" @click="router.push('/subjects')">
+                Open
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>Categories</h5>
+              <p class="text-muted">Project categories</p>
+              <button class="btn btn-outline-primary btn-sm" @click="router.push('/categories')">
+                Open
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="canCreateOrganization(auth.user)" class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>New Organization</h5>
+              <p class="text-muted">Register organization</p>
+              <button class="btn btn-primary btn-sm" @click="router.push('/organizations/create')">
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="canManageSubjects(auth.user)" class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>New Subject</h5>
+              <p class="text-muted">Add academic subject</p>
+              <button class="btn btn-primary btn-sm" @click="router.push('/subjects/create')">
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="canManageCategories(auth.user)" class="col-md-4 col-lg-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5>New Category</h5>
+              <p class="text-muted">Add project category</p>
+              <button class="btn btn-primary btn-sm" @click="router.push('/categories/create')">
                 Create
               </button>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  </div>
 
-      <div v-if="isStaff()" class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>Organizations</h5>
-            <p class="text-muted">Partner organizations</p>
-            <button class="btn btn-outline-primary btn-sm" @click="router.push('/organizations')">
-              Open
-            </button>
-          </div>
-        </div>
-      </div>
+  <div v-else class="container py-5">
+    <div class="alert alert-warning shadow-sm border-0 text-center">
+      <h3 class="mb-3">📩 Email Verification Required</h3>
 
-      <div class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>Subjects</h5>
-            <p class="text-muted">Academic subjects</p>
-            <button class="btn btn-outline-primary btn-sm" @click="router.push('/subjects')">
-              Open
-            </button>
-          </div>
-        </div>
-      </div>
+      <p class="mb-3">
+        Your email address has not been verified yet. Please check your inbox and click the
+        verification link we sent you.
+      </p>
 
-      <div class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>Categories</h5>
-            <p class="text-muted">Project categories</p>
-            <button class="btn btn-outline-primary btn-sm" @click="router.push('/categories')">
-              Open
-            </button>
-          </div>
-        </div>
-      </div>
+      <p class="text-muted mb-4">You cannot use our platform until you confirm your email</p>
 
-      <div v-if="canCreateOrganization(auth.user)" class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>New Organization</h5>
-            <p class="text-muted">Register organization</p>
-            <button class="btn btn-primary btn-sm" @click="router.push('/organizations/create')">
-              Create
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="canManageSubjects(auth.user)" class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>New Subject</h5>
-            <p class="text-muted">Add academic subject</p>
-            <button class="btn btn-primary btn-sm" @click="router.push('/subjects/create')">
-              Create
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="canManageCategories(auth.user)" class="col-md-4 col-lg-3">
-        <div class="card h-100">
-          <div class="card-body">
-            <h5>New Category</h5>
-            <p class="text-muted">Add project category</p>
-            <button class="btn btn-primary btn-sm" @click="router.push('/categories/create')">
-              Create
-            </button>
-          </div>
-        </div>
+      <div>
+        <button class="btn btn-warning btn-lg" :disabled="loading" @click="sendMailVerification">
+          {{ loading ? 'Sending...' : 'Please, Verify Your Email' }}
+        </button>
       </div>
     </div>
   </div>
